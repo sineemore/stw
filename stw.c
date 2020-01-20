@@ -82,6 +82,8 @@ read_text()
 static void
 draw()
 {
+	unsigned int prev_mw = mw;
+	unsigned int prev_mh = mh;
 	mw = 0;
 	mh = 0;
 
@@ -91,14 +93,15 @@ draw()
 		unsigned int w, h;
 		drw_font_getexts(fnt, line, linelen,
 			&w, &h);
-		if (w > mw) {
+		if (w > mw)
 			mw = w;
-		}
 		mh += h;
 		line += linelen + 1;
 	}
 
-	drw_resize(drw, mw, mh);
+	if (prev_mw != mw || prev_mh != mh)
+		drw_resize(drw, mw, mh);
+	
 	drw_rect(drw, 0, 0, sw, sh, 1, 1);
 	
 	unsigned int x = 0;
