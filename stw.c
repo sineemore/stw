@@ -25,36 +25,37 @@
 #include "config.h"
 
 #define LENGTH(X) (sizeof X / sizeof X[0])
+#define INITIAL_CAPACITY 64
 
-struct Line {
-	struct Line *next;
-	char text[];
-};
-
-char *argv0;
-Display *dpy;
-int screen;
-Window root;
-Drw *drw;
-Fnt *fnt;
-Clr *clr;
-struct Line *content;
-unsigned int sw, sh;
-unsigned int mw, mh;
-char align = 'l';
+static char *argv0;
+static Display *dpy;
+static int screen;
+static Window root;
+static Drw *drw;
+static Fnt *fnt;
+static Clr *clr;
+static unsigned int sw, sh;
+static unsigned int mw, mh;
+static char align = 'l';
 static char *text;
 static size_t len;
 static size_t cap;
 
+static void
+usage()
+{
+	die("usage: %s [-g geometry]\n", argv0);
+}
 
-static
-void
+static void
 read_text()
 {
 	len = 0;
 	for (;;) {
 		if (len + 3 >= cap) {
-			cap = cap ? cap * 2 : 64;
+			// text must have sufficient space to
+			// store \0\n in one read
+			cap = cap ? cap * 2 : INITIAL_CAPACITY;
 			text = realloc(text, cap);
 			if (text == NULL)
 				die("realloc:");
@@ -66,19 +67,18 @@ read_text()
 
 		int l = strlen(line);
 		if (l == 0) {
+			// if strlen returns 0, than it's probably \0\n
 			break;
 		}
 
 		len += l;
 
-		if (line[l - 1] == '\n') {
+		if (line[l - 1] == '\n')
 			line[l - 1] = '\0';
-		}
 	}
 }
 
-static
-void
+static void
 draw()
 {
 	mw = 0;
@@ -110,6 +110,7 @@ draw()
 		drw_font_getexts(fnt, line, linelen,
 			&w, &h);
 		
+		// text alignment
 		int ax = x;
 		if (align == 'r') {
 			ax = mw - w;
@@ -121,12 +122,6 @@ draw()
 		y += h;
 		line += linelen + 1;
 	}
-}
-
-static void
-usage()
-{
-	die("usage: %s [-g geometry]\n", argv0);
 }
 
 int
