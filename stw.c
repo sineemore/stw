@@ -16,12 +16,6 @@
 #define INITIAL_CAPACITY 64
 
 static char *argv0;
-static Display *dpy;
-static int screen;
-static Window root;
-static Drw *drw;
-static Fnt *fnt;
-static Clr *clr;
 static unsigned int sw, sh;
 static unsigned int mw, mh;
 static char align = 'l';
@@ -67,7 +61,7 @@ read_text()
 }
 
 static void
-draw()
+draw(Drw *drw, Fnt *fnt)
 {
 	unsigned int prev_mw = mw;
 	unsigned int prev_mh = mh;
@@ -149,23 +143,23 @@ main(int argc, char *argv[])
 		usage();
 	} ARGEND
 
-	dpy = XOpenDisplay(NULL);
+	Display *dpy = XOpenDisplay(NULL);
 	if (!dpy)
 		die("cannot open display");
 	
-	screen = DefaultScreen(dpy);
-	root = RootWindow(dpy, screen);
+	int screen = DefaultScreen(dpy);
+	Window root = RootWindow(dpy, screen);
 
 	sw = DisplayWidth(dpy, screen);
 	sh = DisplayHeight(dpy, screen);
 
-	drw = drw_create(dpy, screen, root, 300, 300);
+	Drw *drw = drw_create(dpy, screen, root, 300, 300);
 	
-	fnt = drw_fontset_create(drw, fonts, LENGTH(fonts));
+	Fnt *fnt = drw_fontset_create(drw, fonts, LENGTH(fonts));
 	if (!fnt)
 		die("no fonts could be loaded");
 
-	clr = drw_scm_create(drw, (const char *[]){f, b}, 2);
+	Clr *clr = drw_scm_create(drw, (const char *[]){f, b}, 2);
 	drw_setscheme(drw, clr);
 	
 	XSetWindowAttributes swa;
@@ -197,7 +191,7 @@ main(int argc, char *argv[])
 		
 		if (fds[0].revents == POLLIN) {
 			read_text();
-			draw();
+			draw(drw, fnt);
 			dirty = 1;
 		}
 		
