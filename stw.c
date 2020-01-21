@@ -23,7 +23,6 @@
 static char *argv0;
 static unsigned int sw, sh;
 static unsigned int mw, mh;
-static char align = 'l';
 static char *text;
 static size_t len;
 static size_t cap;
@@ -41,6 +40,8 @@ usage()
 	[-a alignment]\n\
 	[-f foreground]\n\
 	[-b background]\n\
+	[-F font]\n\
+	[-B borderpx]\n\
 	command [args ...]",
 argv0);
 }
@@ -127,7 +128,7 @@ draw(Drw *drw, Fnt *fnt)
 	}
 
 	if (prev_mw != mw || prev_mh != mh)
-		drw_resize(drw, mw, mh);
+		drw_resize(drw, mw + borderpx * 2, mh + borderpx * 2);
 	
 	drw_rect(drw, 0, 0, sw, sh, 1, 1);
 	
@@ -149,7 +150,7 @@ draw(Drw *drw, Fnt *fnt)
 			ax = (mw - w) / 2;
 		}
 		
-		drw_text(drw, ax, y, w, h, 0, line, 0);
+		drw_text(drw, ax + borderpx, y + borderpx, w, h, 0, line, 0);
 		y += h;
 		line += linelen + 1;
 	}
@@ -160,30 +161,45 @@ main(int argc, char *argv[])
 {
 	int left = 0;
 	int top = 0;
-	unsigned int dumb;
-
-	const char *f = fg;
-	const char *b = bg;
-	const char *tmp;
+	char *font = NULL;
 
 	ARGBEGIN {
 	case 'g':
-		XParseGeometry(EARGF(usage()),
-                	&left, &top, &dumb, &dumb);
+		{
+			unsigned int t;
+			XParseGeometry(EARGF(usage()),
+				&left, &top, &t, &t);
+		}
 		break;
 	case 'f':
-		f = EARGF(usage());
+		colors[0] = EARGF(usage());
 		break;
 	case 'b':
-		b = EARGF(usage());
+		colors[1] = EARGF(usage());
+		break;
+	case 'F':
+		font = EARGF(usage());
+		break;
+	case 'B':
+		{
+			const char *a = EARGF(usage());
+			char *e;
+			long int li = strtol(a, &e, 10);
+			if (a[0] < '0' || a[0] > '9' \
+			|| li < INT_MIN || li > INT_MAX \
+			|| *e != '\0')
+				usage();
+			borderpx = (int)li;
+		}
 		break;
 	case 'a':
-		tmp = EARGF(usage());
-		if (strlen(tmp) != 1)
-			usage();
-		align = tmp[0];
-		if (align != 'l' && align != 'r' && align != 'c')
-			usage();
+		{
+			const char *a = EARGF(usage());
+			align = a[0];
+			if (strlen(a) != 1 \
+			|| align != 'l' && align != 'r' && align != 'c')
+				usage();
+		}
 		break;
 	default:
 		usage();
@@ -216,12 +232,14 @@ main(int argc, char *argv[])
 	sh = DisplayHeight(dpy, screen);
 
 	Drw *drw = drw_create(dpy, screen, root, 300, 300);
-	
-	Fnt *fnt = drw_fontset_create(drw, fonts, LENGTH(fonts));
+
+	Fnt *fnt = drw_fontset_create(drw,
+		font ? (const char *[]){font} : fonts,
+		font ? 1 : LENGTH(fonts));
 	if (!fnt)
 		die("no fonts could be loaded");
 
-	Clr *clr = drw_scm_create(drw, (const char *[]){f, b}, 2);
+	Clr *clr = drw_scm_create(drw, colors, 2);
 	drw_setscheme(drw, clr);
 	
 	XSetWindowAttributes swa;
@@ -311,22 +329,23 @@ main(int argc, char *argv[])
 			int x, y;
 
 			if (signbit((float)left)) {
-				x = sw + left - mw;
+				x = sw + left - mw - borderpx * 2;
 			} else {
 				x = left;
 			}
 
 			if (signbit((float)top)) {
-				y = sh + top - mh;
+				y = sh + top - mh - borderpx * 2;
 			} else {
 				y = top;
 			}
 
 			XMoveResizeWindow(dpy, win,
 				x, y,
-				mw, mh);
+				mw + borderpx * 2, mh + borderpx * 2);
 			XSync(dpy, True);
-			drw_map(drw, win, 0, 0, mw, mh);
+			drw_map(drw, win, 0, 0,
+				mw + borderpx * 2, mh + borderpx * 2);
 		}
 	}
 }

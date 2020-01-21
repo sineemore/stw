@@ -1,5 +1,10 @@
 /* See LICENSE file for copyright and license details. */
 
+static int borderpx = 0;
 static const char *fonts[] = { "monospace:size=10" };
-static const char fg[] = "#000000";
-static const char bg[] = "#dddddd";
+
+/* text alignment: l, r and c for left, right and centered respectively */
+static char align = 'l';
+
+/* foreground and background colors */
+static char *colors[2] = { "#000000", "#dddddd" };
