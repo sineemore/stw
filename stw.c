@@ -181,16 +181,8 @@ main(int argc, char *argv[])
 		font = EARGF(usage());
 		break;
 	case 'B':
-		{
-			const char *a = EARGF(usage());
-			char *e;
-			long int li = strtol(a, &e, 10);
-			if (a[0] < '0' || a[0] > '9' \
-			|| li < INT_MIN || li > INT_MAX \
-			|| *e != '\0')
-				usage();
-			borderpx = (int)li;
-		}
+		if (stoi(EARGF(usage()), &borderpx))
+			usage();
 		break;
 	case 'a':
 		{

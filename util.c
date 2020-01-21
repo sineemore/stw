@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <limits.h>
 
 #include "util.h"
 
@@ -32,4 +33,14 @@ die(const char *fmt, ...) {
 	}
 
 	exit(1);
+}
+
+int
+stoi(char *s, int *r) {
+	char *e;
+	long int li = strtol(s, &e, 10);
+	*r = (int)li;
+	return s[0] < '0' || s[0] > '9' \
+		|| li < INT_MIN || li > INT_MAX \
+		|| *e != '\0';
 }
