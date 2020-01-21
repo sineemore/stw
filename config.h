@@ -8,3 +8,6 @@ static char align = 'l';
 
 /* foreground and background colors */
 static char *colors[2] = { "#000000", "#dddddd" };
+
+/* time in seconds between command runs */
+static int period = 60;

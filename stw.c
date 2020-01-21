@@ -5,6 +5,7 @@
 #include <signal.h>
 #include <stdio.h>
 #include <string.h>
+#include <time.h>
 #include <sys/signalfd.h>
 #include <sys/types.h>
 #include <sys/wait.h>
@@ -30,6 +31,7 @@ static FILE *inputf;
 static pid_t cmdpid;
 static int sfd, xfd;
 static char **cmd;
+struct timespec last;
 
 static void
 usage()
@@ -42,6 +44,7 @@ usage()
 	[-b background]\n\
 	[-F font]\n\
 	[-B borderpx]\n\
+	[-p period]\n\
 	command [args ...]",
 argv0);
 }
@@ -193,6 +196,10 @@ main(int argc, char *argv[])
 				usage();
 		}
 		break;
+	case 'p':
+		if (stoi(EARGF(usage()), &period))
+			usage();
+		break;
 	default:
 		usage();
 	} ARGEND
@@ -255,34 +262,33 @@ main(int argc, char *argv[])
 	xfd = ConnectionNumber(dpy);
 
 	struct pollfd fds[] = {
-		{.fd = 0,   .events = POLLIN},
 		{.fd = sfd, .events = POLLIN},
-		{.fd = xfd, .events = POLLIN}
+		{.fd = xfd, .events = POLLIN},
+		{.fd = 0,   .events = POLLIN}
 	};
 	
 	for (;;) {
 
-		if (cmdpid == 0) {
-			if (inputf != NULL)
-				fclose(inputf);
+		struct timespec now;
+		if (clock_gettime(CLOCK_BOOTTIME, &now) == -1)
+			die("clock_gettime:");
+
+		int timeout = cmdpid == 0
+			? last.tv_sec + period - now.tv_sec
+			: -1;
+
+		if (cmdpid == 0 && timeout <= 0)
 			start_cmd();
-		}
 
 		int dirty = 0;
-		fds[0].fd = fileno(inputf);
+		fds[2].fd = fileno(inputf);
 		for (int i = 0; i < LENGTH(fds); i++)
 			fds[i].revents = 0;
 
-		if (-1 == poll(fds, LENGTH(fds), -1))
+		if (-1 == poll(fds, LENGTH(fds) - (cmdpid == 0), cmdpid == 0 ? timeout : -1))
 			die("poll:");
-		
-		if (fds[0].revents & POLLIN) {
-			read_text();
-			draw(drw, fnt);
-			dirty = 1;
-		}
 
-		if (fds[1].revents & POLLIN) {
+		if (fds[0].revents & POLLIN) {
 			struct signalfd_siginfo tmp;
 			if (-1 == read(sfd, &tmp, sizeof(tmp)))
 				die("read signalfd:");
@@ -298,12 +304,17 @@ main(int argc, char *argv[])
 				}
 				if (p == 0)
 					break;
-				if (p == cmdpid && (WIFEXITED(wstatus) || WIFSIGNALED(wstatus)))
+				if (p == cmdpid && (WIFEXITED(wstatus) || WIFSIGNALED(wstatus))) {
 					cmdpid = 0;
+					if (inputf != NULL)
+						fclose(inputf);
+					if (clock_gettime(CLOCK_BOOTTIME, &last) == -1)
+						die("clock_gettime:");
+				}
 			}
 		}
 		
-		if (fds[2].revents & POLLIN) {
+		if (fds[1].revents & POLLIN) {
 			XEvent ev;
 			if (XNextEvent(dpy, &ev))
 				break;
@@ -314,7 +325,14 @@ main(int argc, char *argv[])
 			} else if (ev.type == ButtonPress) {
 				if (cmdpid)
 					kill(cmdpid, SIGTERM);
+				last = (struct timespec){0};
 			}
+		}
+
+		if (fds[2].revents & POLLIN) {
+			read_text();
+			draw(drw, fnt);
+			dirty = 1;
 		}
 
 		if (dirty && mw > 0 && mh > 0) {
