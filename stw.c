@@ -5,10 +5,10 @@
 #include <signal.h>
 #include <stdio.h>
 #include <string.h>
-#include <time.h>
 #include <sys/signalfd.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <time.h>
 #include <unistd.h>
 #include <X11/Xft/Xft.h>
 #include <X11/Xlib.h>
@@ -19,19 +19,24 @@
 #include "config.h"
 
 #define LENGTH(X) (sizeof X / sizeof X[0])
-#define INITIAL_CAPACITY 64
+#define INITIAL_CAPACITY 2
 
 static char *argv0;
+static Display *dpy;
+static int xfd;
+static Drw *drw;
+static Fnt *fnt;
+static Window win;
 static unsigned int sw, sh;
 static unsigned int mw, mh;
+static int left, top;
+static char **cmd;
+static pid_t cmdpid;
+static FILE *inputf;
 static char *text;
 static size_t len;
 static size_t cap;
-static FILE *inputf;
-static pid_t cmdpid;
-static int sfd, xfd;
-static char **cmd;
-struct timespec last;
+static int spipe[2];
 
 static void
 usage()
@@ -50,7 +55,15 @@ argv0);
 }
 
 static void
-start_cmd() {
+signal_handler(int s)
+{
+	if (-1 == write(spipe[1], s == SIGCHLD ? "c" : "a", 1))
+		abort();
+}
+
+static void
+start_cmd()
+{
 	int fds[2];
 	if (-1 == pipe(fds))
 		die("pipe:");
@@ -63,7 +76,8 @@ start_cmd() {
 	case -1:
 		die("fork:");
 	case 0:
-		close(sfd);
+		close(spipe[0]);
+		close(spipe[1]);
 		close(xfd);
 		close(fds[0]);
 		dup2(fds[1], STDOUT_FILENO);
@@ -77,11 +91,13 @@ start_cmd() {
 static void
 read_text()
 {
+	int dlen = strlen(delimeter);
+
 	len = 0;
 	for (;;) {
-		if (len + 3 >= cap) {
-			// text must have sufficient space to
-			// store \0\n in one read
+		if (len + dlen + 2 > cap) {
+			// buffer must have sufficient capacity to
+			// store delimeter string, \n and \0 in one read
 			cap = cap ? cap * 2 : INITIAL_CAPACITY;
 			text = realloc(text, cap);
 			if (text == NULL)
@@ -97,21 +113,24 @@ read_text()
 			}
 		}
 
-		int l = strlen(line);
-		if (l == 0) {
-			// if strlen returns 0, than it's probably \0\n
-			break;
+		int llen = strlen(line);
+
+		if (line[llen - 1] == '\n') {
+			line[--llen] = '\0';
+			len += llen + 1;
+		} else {
+			len += llen;
 		}
 
-		len += l;
-
-		if (line[l - 1] == '\n')
-			line[l - 1] = '\0';
+		if (llen == dlen && strcmp(line, delimeter) == 0) {
+			len -= dlen + 2;
+			break;
+		}
 	}
 }
 
 static void
-draw(Drw *drw, Fnt *fnt)
+draw()
 {
 	unsigned int prev_mw = mw;
 	unsigned int prev_mh = mh;
@@ -120,31 +139,32 @@ draw(Drw *drw, Fnt *fnt)
 
 	char *line = text;
 	while (line < text + len) {
-		int linelen = strlen(line);
+		int llen = strlen(line);
 		unsigned int w, h;
-		drw_font_getexts(fnt, line, linelen,
+		drw_font_getexts(fnt, line, llen,
 			&w, &h);
 		if (w > mw)
 			mw = w;
+
 		mh += h;
-		line += linelen + 1;
+		line += llen + 1;
 	}
 
 	if (prev_mw != mw || prev_mh != mh)
 		drw_resize(drw, mw + borderpx * 2, mh + borderpx * 2);
-	
+
 	drw_rect(drw, 0, 0, sw, sh, 1, 1);
-	
+
 	unsigned int x = 0;
 	unsigned int y = 0;
 
 	line = text;
 	while (line < text + len) {
-		int linelen = strlen(line);
+		int llen = strlen(line);
 		unsigned int w, h;
-		drw_font_getexts(fnt, line, linelen,
+		drw_font_getexts(fnt, line, llen,
 			&w, &h);
-		
+
 		// text alignment
 		int ax = x;
 		if (align == 'r') {
@@ -152,19 +172,199 @@ draw(Drw *drw, Fnt *fnt)
 		} else if (align == 'c') {
 			ax = (mw - w) / 2;
 		}
-		
+
 		drw_text(drw, ax + borderpx, y + borderpx, w, h, 0, line, 0);
 		y += h;
-		line += linelen + 1;
+		line += llen + 1;
 	}
+}
+
+static void
+reap()
+{
+	for (;;) {
+		int wstatus;
+		pid_t p = waitpid(-1, &wstatus,
+			cmdpid == 0 ? WNOHANG : 0);
+		if (p == -1) {
+			if (cmdpid == 0 && errno == ECHILD) {
+				errno = 0;
+				break;
+			} else {
+				die("waitpid:");
+			}
+		}
+		if (p == 0)
+			break;
+		if (p == cmdpid
+		&& (WIFEXITED(wstatus) || WIFSIGNALED(wstatus)))
+			cmdpid = 0;
+	}
+	if (fclose(inputf) == -1)
+		die("close:");
+}
+
+static void
+run()
+{
+	struct pollfd fds[] = {
+		{.fd = spipe[0], .events = POLLIN}, // signals
+		{.fd = xfd,      .events = POLLIN}, // xlib
+		{.fd = 0,        .events = POLLIN}  // cmd stdout (set later)
+	};
+
+	int restart_now = 1;
+	for (;;) {
+		if (restart_now && cmdpid == 0) {
+			restart_now = 0;
+			start_cmd();
+		}
+
+		int dirty = 0;
+		fds[2].fd = cmdpid != 0 ? fileno(inputf) : 0;
+		for (int i = 0; i < LENGTH(fds); i++)
+			fds[i].revents = 0;
+
+		if (-1 == poll(fds, LENGTH(fds) - (cmdpid == 0), -1)) {
+			if (errno == EINTR) {
+				errno = 0;
+				continue;
+			}
+			die("poll:");
+		}
+
+
+		if (fds[0].revents & POLLIN) {
+			// signals
+			char s;
+			if (-1 == read(spipe[0], &s, 1))
+				die("sigpipe read:");
+			if (s == 'c') {// sigchld received
+				reap();
+				if (!restart_now)
+					alarm(period);
+			} else if (s == 'a' && cmdpid == 0) // sigalrm received
+				start_cmd();
+		}
+
+		if (fds[1].revents & POLLIN) {
+			// xlib
+			XEvent ev;
+			if (XNextEvent(dpy, &ev))
+				break;
+			if (ev.type == Expose) {
+				if (ev.xexpose.count == 0)
+					dirty = 1;
+			} else if (ev.type == ButtonPress) {
+				if (cmdpid && kill(cmdpid, SIGTERM) == -1)
+					die("kill:");
+				alarm(0);
+				restart_now = 1;
+			}
+		}
+
+		if (fds[2].revents & POLLIN) {
+			// cmd stdout
+			read_text();
+			draw();
+			dirty = 1;
+		}
+
+		if (dirty && mw > 0 && mh > 0) {
+			// window redraw
+			int x = 0;
+			int y = 0;
+
+			// todo: totally broken
+			if (signbit((float)left)) {
+				x = sw + left - mw - borderpx * 2;
+			} else {
+				x = left;
+			}
+
+			if (signbit((float)top)) {
+				y = sh + top - mh - borderpx * 2;
+			} else {
+				y = top;
+			}
+
+			XMoveResizeWindow(dpy, win,
+				x, y,
+				mw + borderpx * 2, mh + borderpx * 2);
+			XSync(dpy, True);
+			drw_map(drw, win, 0, 0,
+				mw + borderpx * 2, mh + borderpx * 2);
+		}
+	}
+}
+
+static void
+setup(char *font)
+{
+	// self pipe and signal handler
+
+	if (pipe(spipe) == -1)
+		die("pipe:");
+
+	struct sigaction sa = {0};
+	sa.sa_handler = signal_handler;
+	sa.sa_flags = SA_RESTART;
+
+	if (sigaction(SIGCHLD, &sa, NULL) == -1
+	|| sigaction(SIGALRM, &sa, NULL) == -1)
+		die("sigaction:");
+
+	// xlib
+
+	dpy = XOpenDisplay(NULL);
+	if (!dpy)
+		die("cannot open display");
+
+	xfd = ConnectionNumber(dpy);
+
+	int screen = DefaultScreen(dpy);
+	Window root = RootWindow(dpy, screen);
+
+	sw = DisplayWidth(dpy, screen);
+	sh = DisplayHeight(dpy, screen);
+
+
+	// drw drawing context
+
+	drw = drw_create(dpy, screen, root, 300, 300);
+
+	fnt = drw_fontset_create(drw, &font, 1);
+	if (!fnt)
+		die("no fonts could be loaded");
+
+	Clr *clr = drw_scm_create(drw, colors, 2);
+	drw_setscheme(drw, clr);
+
+
+	// x window
+
+	XSetWindowAttributes swa;
+	swa.override_redirect = True;
+	swa.background_pixel = clr[1].pixel;
+	swa.event_mask = ExposureMask | ButtonPressMask;
+
+	win = XCreateWindow(dpy, root,
+		-1, -1, 1, 1,
+		0,
+		CopyFromParent, CopyFromParent, CopyFromParent,
+		CWOverrideRedirect | CWBackPixel | CWEventMask,
+		&swa);
+
+	XLowerWindow(dpy, win);
+	XMapWindow(dpy, win);
+	XSelectInput(dpy, win, swa.event_mask);
+	XSync(dpy, True);
 }
 
 int
 main(int argc, char *argv[])
 {
-	int left = 0;
-	int top = 0;
-	char *font = NULL;
+	char *xfont = font;
 
 	ARGBEGIN {
 	case 'g':
@@ -181,7 +381,7 @@ main(int argc, char *argv[])
 		colors[1] = EARGF(usage());
 		break;
 	case 'F':
-		font = EARGF(usage());
+		xfont = EARGF(usage());
 		break;
 	case 'B':
 		if (stoi(EARGF(usage()), &borderpx))
@@ -209,153 +409,6 @@ main(int argc, char *argv[])
 
 	cmd = argv;
 
-	sigset_t mask;
-	sigemptyset(&mask);
-	sigaddset(&mask, SIGCHLD);
-
-	if (sigprocmask(SIG_BLOCK, &mask, NULL) == -1)
-		die("sigprocmask:");
-	
-	sfd = signalfd(-1, &mask, 0);
-	if (sfd == -1)
-		die("signalfd:");
-
-	Display *dpy = XOpenDisplay(NULL);
-	if (!dpy)
-		die("cannot open display");
-	
-	int screen = DefaultScreen(dpy);
-	Window root = RootWindow(dpy, screen);
-
-	sw = DisplayWidth(dpy, screen);
-	sh = DisplayHeight(dpy, screen);
-
-	Drw *drw = drw_create(dpy, screen, root, 300, 300);
-
-	Fnt *fnt = drw_fontset_create(drw,
-		font ? (const char *[]){font} : fonts,
-		font ? 1 : LENGTH(fonts));
-	if (!fnt)
-		die("no fonts could be loaded");
-
-	Clr *clr = drw_scm_create(drw, colors, 2);
-	drw_setscheme(drw, clr);
-	
-	XSetWindowAttributes swa;
-	swa.override_redirect = True;
-	swa.background_pixel = clr[1].pixel;
-	swa.event_mask = ExposureMask | ButtonPressMask;
-	
-	Window win = XCreateWindow(dpy, root,
-		-1, -1, 1, 1,
-		0,
-		CopyFromParent, CopyFromParent, CopyFromParent,
-		CWOverrideRedirect | CWBackPixel | CWEventMask,
-		&swa);
-	
-	XLowerWindow(dpy, win);
-	XMapWindow(dpy, win);
-
-	XSelectInput(dpy, win, swa.event_mask);	
-	XSync(dpy, True);
-
-	xfd = ConnectionNumber(dpy);
-
-	struct pollfd fds[] = {
-		{.fd = sfd, .events = POLLIN},
-		{.fd = xfd, .events = POLLIN},
-		{.fd = 0,   .events = POLLIN}
-	};
-	
-	for (;;) {
-
-		struct timespec now;
-		if (clock_gettime(CLOCK_BOOTTIME, &now) == -1)
-			die("clock_gettime:");
-
-		int timeout = cmdpid == 0
-			? last.tv_sec + period - now.tv_sec
-			: -1;
-
-		if (cmdpid == 0 && timeout <= 0)
-			start_cmd();
-
-		int dirty = 0;
-		fds[2].fd = fileno(inputf);
-		for (int i = 0; i < LENGTH(fds); i++)
-			fds[i].revents = 0;
-
-		if (-1 == poll(fds, LENGTH(fds) - (cmdpid == 0), cmdpid == 0 ? timeout : -1))
-			die("poll:");
-
-		if (fds[0].revents & POLLIN) {
-			struct signalfd_siginfo tmp;
-			if (-1 == read(sfd, &tmp, sizeof(tmp)))
-				die("read signalfd:");
-			for (;;) {
-				int wstatus;
-				pid_t p = waitpid(-1, &wstatus, WNOHANG);
-				if (p == -1) {
-					if (cmdpid == 0 && errno == ECHILD) {
-						errno = 0;
-						break;
-					}
-					die("waitpid:");
-				}
-				if (p == 0)
-					break;
-				if (p == cmdpid && (WIFEXITED(wstatus) || WIFSIGNALED(wstatus))) {
-					cmdpid = 0;
-					if (inputf != NULL)
-						fclose(inputf);
-					if (clock_gettime(CLOCK_BOOTTIME, &last) == -1)
-						die("clock_gettime:");
-				}
-			}
-		}
-		
-		if (fds[1].revents & POLLIN) {
-			XEvent ev;
-			if (XNextEvent(dpy, &ev))
-				break;
-			if (ev.type == Expose) {
-				XExposeEvent *ee = &ev.xexpose;
-        			if (ee->count == 0)
-					dirty = 1;
-			} else if (ev.type == ButtonPress) {
-				if (cmdpid)
-					kill(cmdpid, SIGTERM);
-				last = (struct timespec){0};
-			}
-		}
-
-		if (fds[2].revents & POLLIN) {
-			read_text();
-			draw(drw, fnt);
-			dirty = 1;
-		}
-
-		if (dirty && mw > 0 && mh > 0) {
-			int x, y;
-
-			if (signbit((float)left)) {
-				x = sw + left - mw - borderpx * 2;
-			} else {
-				x = left;
-			}
-
-			if (signbit((float)top)) {
-				y = sh + top - mh - borderpx * 2;
-			} else {
-				y = top;
-			}
-
-			XMoveResizeWindow(dpy, win,
-				x, y,
-				mw + borderpx * 2, mh + borderpx * 2);
-			XSync(dpy, True);
-			drw_map(drw, win, 0, 0,
-				mw + borderpx * 2, mh + borderpx * 2);
-		}
-	}
+	setup(xfont);
+	run();
 }
