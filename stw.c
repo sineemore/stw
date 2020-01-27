@@ -190,9 +190,10 @@ reap()
 				break;
 			}
 			die("waitpid:");
+		}
 		if (p == 0)
 			break;
-		if (p == cmdpid && (WIFEXITED(wstatus) || WIFSIGNALED(wstatus)))
+		if (p == cmdpid && (WIFEXITED(wstatus) || WIFSIGNALED(wstatus))) {
 			cmdpid = 0;
 		}
 	}
