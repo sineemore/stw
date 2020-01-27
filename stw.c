@@ -16,6 +16,13 @@
 #include "arg.h"
 #include "drw.h"
 #include "util.h"
+
+struct g {
+	int value;
+	char prefix;
+	char suffix;
+};
+
 #include "config.h"
 
 #define LENGTH(X) (sizeof X / sizeof X[0])
@@ -29,7 +36,6 @@ static Fnt *fnt;
 static Window win;
 static unsigned int sw, sh;
 static unsigned int mw, mh;
-static int left, top;
 static char **cmd;
 static pid_t cmdpid;
 static FILE *inputf;
@@ -43,7 +49,10 @@ usage()
 {
 	die(
 "usage: %s\n\
-	[-g geometry]\n\
+	[-x x position]\n\
+	[-y y position]\n\
+	[-X x translate]\n\
+	[-Y y translate]\n\
 	[-a alignment]\n\
 	[-f foreground]\n\
 	[-b background]\n\
@@ -276,20 +285,38 @@ run()
 
 		if (dirty && mw > 0 && mh > 0) {
 			// window redraw
-			int x = 0;
-			int y = 0;
+			int x = px.suffix == '%'
+				? (px.value / 100.0) * sw
+				: px.value;
 
-			// todo: totally broken
-			if (signbit((float)left)) {
-				x = sw + left - mw - borderpx * 2;
-			} else {
-				x = left;
+			if (px.prefix == '-') {
+				x = sw - x - mw - borderpx * 2;
 			}
 
-			if (signbit((float)top)) {
-				y = sh + top - mh - borderpx * 2;
-			} else {
-				y = top;
+			if (tx.value != '0') {
+				int v = tx.value;
+				if (tx.suffix == '%')
+					v = (v / 100.0) * mw;
+				if (tx.prefix == '-')
+					v *= -1;
+				x += v;
+			}
+
+			int y = py.suffix == '%'
+				? (py.value / 100.0) * sh
+				: py.value;
+
+			if (py.prefix == '-') {
+				y = sh - y - mh - borderpx * 2;
+			}
+
+			if (ty.value != '0') {
+				int v = ty.value;
+				if (ty.suffix == '%')
+					v = (v / 100.0) * mh;
+				if (ty.prefix == '-')
+					v *= -1;
+				y += v;
 			}
 
 			XMoveResizeWindow(
@@ -369,19 +396,74 @@ setup(char *font)
 	XSync(dpy, True);
 }
 
+static int
+parsegeom(char *b, char *prefix, char *suffix, struct g *g)
+{
+	g->prefix = 0;
+	g->suffix = 0;
+
+	if (b[0] < '0' || b[0] > '9') {
+		for (char *t = prefix; *t; t++) {
+			if (*t == b[0]) {
+				g->prefix = b[0];
+				break;
+			}
+		}
+		if (g->prefix == 0) {
+			return -1;
+		}
+		b++;
+	}
+
+	if (b[0] < '0' || b[0] > '9')
+		return -1;
+
+	char *e;
+	long int li = strtol(b, &e, 10);
+
+	if (b == e || li < INT_MIN || li > INT_MAX)
+		return -1;
+
+	g->value = (int)li;
+	b = e;
+
+	if (b[0] != '\0') {
+		for (char *t = suffix; *t; t++) {
+			if (*t == b[0]) {
+				g->suffix = b[0];
+				break;
+			}
+		}
+		if (g->suffix == 0 || b[1] != '\0') {
+			return -1;
+		}
+	}
+
+	return 0;
+}
+
 int
 main(int argc, char *argv[])
 {
 	char *xfont = font;
 
 	ARGBEGIN {
-	case 'g': {
-		unsigned int t;
-		XParseGeometry(
-			EARGF(usage()),
-			&left, &top, &t, &t
-		);
-	} break;
+	case 'x':
+		if (-1 == parsegeom(EARGF(usage()), "+-", "%", &px))
+			usage();
+		break;
+	case 'y':
+		if (-1 == parsegeom(EARGF(usage()), "+-", "%", &py))
+			usage();
+		break;
+	case 'X':
+		if (-1 == parsegeom(EARGF(usage()), "+-", "%", &tx))
+			usage();
+		break;
+	case 'Y':
+		if (-1 == parsegeom(EARGF(usage()), "+-", "%", &ty))
+			usage();
+		break;
 	case 'f':
 		colors[0] = EARGF(usage());
 		break;

@@ -3,6 +3,11 @@
 static int borderpx = 0;
 static char font[] = "monospace:size=10";
 
+struct g px = {.prefix = '-'};
+struct g py = {.prefix = '-'};
+struct g tx = {0};
+struct g ty = {0};
+
 /* text alignment: l, r and c for left, right and centered respectively */
 static char align = 'l';
 
