@@ -72,7 +72,8 @@ start_cmd()
 	if (inputf == NULL)
 		die("fdopen:");
 
-	switch (cmdpid = fork()) {
+	cmdpid = fork();
+	switch (cmdpid) {
 	case -1:
 		die("fork:");
 	case 0:
@@ -141,8 +142,7 @@ draw()
 	while (line < text + len) {
 		int llen = strlen(line);
 		unsigned int w, h;
-		drw_font_getexts(fnt, line, llen,
-			&w, &h);
+		drw_font_getexts(fnt, line, llen, &w, &h);
 		if (w > mw)
 			mw = w;
 
@@ -162,8 +162,7 @@ draw()
 	while (line < text + len) {
 		int llen = strlen(line);
 		unsigned int w, h;
-		drw_font_getexts(fnt, line, llen,
-			&w, &h);
+		drw_font_getexts(fnt, line, llen, &w, &h);
 
 		// text alignment
 		int ax = x;
@@ -184,21 +183,18 @@ reap()
 {
 	for (;;) {
 		int wstatus;
-		pid_t p = waitpid(-1, &wstatus,
-			cmdpid == 0 ? WNOHANG : 0);
+		pid_t p = waitpid(-1, &wstatus, cmdpid == 0 ? WNOHANG : 0);
 		if (p == -1) {
 			if (cmdpid == 0 && errno == ECHILD) {
 				errno = 0;
 				break;
-			} else {
-				die("waitpid:");
 			}
-		}
+			die("waitpid:");
 		if (p == 0)
 			break;
-		if (p == cmdpid
-		&& (WIFEXITED(wstatus) || WIFSIGNALED(wstatus)))
+		if (p == cmdpid && (WIFEXITED(wstatus) || WIFSIGNALED(wstatus)))
 			cmdpid = 0;
+		}
 	}
 	if (fclose(inputf) == -1)
 		die("close:");
@@ -239,12 +235,17 @@ run()
 			char s;
 			if (-1 == read(spipe[0], &s, 1))
 				die("sigpipe read:");
-			if (s == 'c') {// sigchld received
+
+			if (s == 'c') {
+				// sigchld received
 				reap();
-				if (!restart_now)
+				if (!restart_now) {
 					alarm(period);
-			} else if (s == 'a' && cmdpid == 0) // sigalrm received
+				}
+			} else if (s == 'a' && cmdpid == 0) {
+				// sigalrm received
 				start_cmd();
+			}
 		}
 
 		if (fds[1].revents & POLLIN) {
@@ -252,9 +253,11 @@ run()
 			XEvent ev;
 			if (XNextEvent(dpy, &ev))
 				break;
+
 			if (ev.type == Expose) {
-				if (ev.xexpose.count == 0)
+				if (ev.xexpose.count == 0) {
 					dirty = 1;
+				}
 			} else if (ev.type == ButtonPress) {
 				if (cmdpid && kill(cmdpid, SIGTERM) == -1)
 					die("kill:");
@@ -288,12 +291,15 @@ run()
 				y = top;
 			}
 
-			XMoveResizeWindow(dpy, win,
-				x, y,
-				mw + borderpx * 2, mh + borderpx * 2);
+			XMoveResizeWindow(
+				dpy, win, x, y,
+				mw + borderpx * 2, mh + borderpx * 2
+			);
 			XSync(dpy, True);
-			drw_map(drw, win, 0, 0,
-				mw + borderpx * 2, mh + borderpx * 2);
+			drw_map(
+				drw, win, 0, 0,
+				mw + borderpx * 2, mh + borderpx * 2
+			);
 		}
 	}
 }
@@ -348,12 +354,13 @@ setup(char *font)
 	swa.background_pixel = clr[1].pixel;
 	swa.event_mask = ExposureMask | ButtonPressMask;
 
-	win = XCreateWindow(dpy, root,
-		-1, -1, 1, 1,
-		0,
+	win = XCreateWindow(
+		dpy, root,
+		-1, -1, 1, 1, 0,
 		CopyFromParent, CopyFromParent, CopyFromParent,
 		CWOverrideRedirect | CWBackPixel | CWEventMask,
-		&swa);
+		&swa
+	);
 
 	XLowerWindow(dpy, win);
 	XMapWindow(dpy, win);
@@ -367,13 +374,13 @@ main(int argc, char *argv[])
 	char *xfont = font;
 
 	ARGBEGIN {
-	case 'g':
-		{
-			unsigned int t;
-			XParseGeometry(EARGF(usage()),
-				&left, &top, &t, &t);
-		}
-		break;
+	case 'g': {
+		unsigned int t;
+		XParseGeometry(
+			EARGF(usage()),
+			&left, &top, &t, &t
+		);
+	} break;
 	case 'f':
 		colors[0] = EARGF(usage());
 		break;
@@ -387,15 +394,13 @@ main(int argc, char *argv[])
 		if (stoi(EARGF(usage()), &borderpx))
 			usage();
 		break;
-	case 'a':
-		{
-			const char *a = EARGF(usage());
-			align = a[0];
-			if (strlen(a) != 1 \
-			|| align != 'l' && align != 'r' && align != 'c')
-				usage();
-		}
-		break;
+	case 'a': {
+		const char *a = EARGF(usage());
+		align = a[0];
+		if (strlen(a) != 1 \
+		|| align != 'l' && align != 'r' && align != 'c')
+			usage();
+	} break;
 	case 'p':
 		if (stoi(EARGF(usage()), &period))
 			usage();
