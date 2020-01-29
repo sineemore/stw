@@ -1,9 +1,12 @@
 /* See LICENSE file for copyright and license details. */
 #include <errno.h>
+#include <limits.h>
 #include <math.h>
 #include <poll.h>
 #include <signal.h>
+#include <stdarg.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <sys/signalfd.h>
 #include <sys/types.h>
@@ -14,8 +17,6 @@
 #include <X11/Xlib.h>
 
 #include "arg.h"
-#include "drw.h"
-#include "util.h"
 
 struct g {
 	int value;
@@ -29,11 +30,6 @@ struct g {
 #define INITIAL_CAPACITY 2
 
 static char *argv0;
-static Display *dpy;
-static int xfd;
-static Drw *drw;
-static Fnt *fnt;
-static Window win;
 static unsigned int sw, sh;
 static unsigned int mw, mh;
 static char **cmd;
@@ -43,6 +39,37 @@ static char *text;
 static size_t len;
 static size_t cap;
 static int spipe[2];
+
+// xlib and xft
+static Display *dpy;
+static int xfd;
+static int screen;
+static Window win, root;
+static Drawable drawable;
+static XftDraw *xdraw;
+static XftColor xforeground, xbackground;
+static XftFont *xfont;
+
+static void
+die(const char *fmt, ...)
+{
+	int tmp = errno;
+	va_list ap;
+
+	va_start(ap, fmt);
+	vfprintf(stderr, fmt, ap);
+	va_end(ap);
+
+	if (fmt[0] && fmt[strlen(fmt)-1] == ':') {
+		fputc(' ', stderr);
+		errno = tmp;
+		perror(NULL);
+	} else {
+		fputc('\n', stderr);
+	}
+
+	exit(1);
+}
 
 static void
 usage()
@@ -144,46 +171,49 @@ draw()
 {
 	unsigned int prev_mw = mw;
 	unsigned int prev_mh = mh;
+
+	// find maximum text line width and height
 	mw = 0;
 	mh = 0;
-
-	char *line = text;
-	while (line < text + len) {
-		int llen = strlen(line);
-		unsigned int w, h;
-		drw_font_getexts(fnt, line, llen, &w, &h);
-		if (w > mw)
-			mw = w;
-
-		mh += h;
-		line += llen + 1;
+	for (char *line = text; line < text + len; line += strlen(line) + 1) {
+		XGlyphInfo ex;
+		XftTextExtentsUtf8(dpy, xfont, (unsigned char *)line, strlen(line), &ex);
+		if (ex.xOff > mw)
+			mw = ex.xOff;
+		mh += xfont->ascent + xfont->descent;
 	}
 
-	if (prev_mw != mw || prev_mh != mh)
-		drw_resize(drw, mw + borderpx * 2, mh + borderpx * 2);
+	mw += borderpx * 2;
+	mh += borderpx * 2;
 
-	drw_rect(drw, 0, 0, sw, sh, 1, 1);
+	if (mw != prev_mw || mh != prev_mh) {
+		XFreePixmap(dpy, drawable);
+		drawable = XCreatePixmap(dpy, root, mw, mh, DefaultDepth(dpy, screen));
+		if (!drawable)
+			die("cannot allocate drawable");
+		XftDrawChange(xdraw, drawable);
+	}
+	XftDrawRect(xdraw, &xbackground, 0, 0, mw, mh);
 
-	unsigned int x = 0;
-	unsigned int y = 0;
-
-	line = text;
-	while (line < text + len) {
-		int llen = strlen(line);
-		unsigned int w, h;
-		drw_font_getexts(fnt, line, llen, &w, &h);
+	// render text lines
+	unsigned int y = borderpx;
+	for (char *line = text; line < text + len; line += strlen(line) + 1) {
+		XGlyphInfo ex;
+		XftTextExtentsUtf8(dpy, xfont, (unsigned char *)line, strlen(line), &ex);
 
 		// text alignment
-		int ax = x;
+		unsigned int x = borderpx;
 		if (align == 'r') {
-			ax = mw - w;
+			x = mw - ex.xOff;
 		} else if (align == 'c') {
-			ax = (mw - w) / 2;
+			x = (mw - ex.xOff) / 2;
 		}
 
-		drw_text(drw, ax + borderpx, y + borderpx, w, h, 0, line, 0);
-		y += h;
-		line += llen + 1;
+		XftDrawStringUtf8(
+			xdraw, &xforeground, xfont, x, y + xfont->ascent,
+			(unsigned char *)line, strlen(line)
+		);
+		y += xfont->ascent + xfont->descent;
 	}
 }
 
@@ -290,7 +320,7 @@ run()
 				: px.value;
 
 			if (px.prefix == '-') {
-				x = sw - x - mw - borderpx * 2;
+				x = sw - x - mw;
 			}
 
 			if (tx.value != '0') {
@@ -307,7 +337,7 @@ run()
 				: py.value;
 
 			if (py.prefix == '-') {
-				y = sh - y - mh - borderpx * 2;
+				y = sh - y - mh;
 			}
 
 			if (ty.value != '0') {
@@ -321,13 +351,13 @@ run()
 
 			XMoveResizeWindow(
 				dpy, win, x, y,
-				mw + borderpx * 2, mh + borderpx * 2
+				mw, mh
 			);
-			XSync(dpy, True);
-			drw_map(
-				drw, win, 0, 0,
-				mw + borderpx * 2, mh + borderpx * 2
+			XCopyArea(
+				dpy, drawable, win, XDefaultGC(dpy, screen),
+				0, 0, mw, mh, 0, 0
 			);
+			XSync(dpy, False);
 		}
 	}
 }
@@ -348,7 +378,7 @@ setup(char *font)
 	|| sigaction(SIGALRM, &sa, NULL) == -1)
 		die("sigaction:");
 
-	// xlib
+	// xlib and xft
 
 	dpy = XOpenDisplay(NULL);
 	if (!dpy)
@@ -356,30 +386,29 @@ setup(char *font)
 
 	xfd = ConnectionNumber(dpy);
 
-	int screen = DefaultScreen(dpy);
-	Window root = RootWindow(dpy, screen);
+	screen = DefaultScreen(dpy);
+	root = RootWindow(dpy, screen);
 
 	sw = DisplayWidth(dpy, screen);
 	sh = DisplayHeight(dpy, screen);
 
-
-	// drw drawing context
-
-	drw = drw_create(dpy, screen, root, 300, 300);
-
-	fnt = drw_fontset_create(drw, &font, 1);
-	if (!fnt)
-		die("no fonts could be loaded");
-
-	Clr *clr = drw_scm_create(drw, colors, 2);
-	drw_setscheme(drw, clr);
-
-
-	// x window
+	Visual *visual = DefaultVisual(dpy, screen);
+	Colormap colormap = DefaultColormap(dpy, screen);
+	// dumb 1x1 drawable only to initialize xdraw
+	drawable = XCreatePixmap(dpy, root, 1, 1, DefaultDepth(dpy, screen));
+	xdraw = XftDrawCreate(dpy, drawable, visual, colormap);
+	xfont = XftFontOpenName(dpy, screen, font);
+	if (!xfont)
+		die("cannot load font");
+	// todo: use dedicated color variables instead of array
+	if (!XftColorAllocName(dpy, visual, colormap, colors[0], &xforeground))
+		die("cannot allocate foreground color");
+	if (!XftColorAllocName(dpy, visual, colormap, colors[1], &xbackground))
+		die("cannot allocate background color");
 
 	XSetWindowAttributes swa;
 	swa.override_redirect = True;
-	swa.background_pixel = clr[1].pixel;
+	swa.background_pixel = xbackground.pixel;
 	swa.event_mask = ExposureMask | ButtonPressMask;
 
 	win = XCreateWindow(
@@ -393,7 +422,6 @@ setup(char *font)
 	XLowerWindow(dpy, win);
 	XMapWindow(dpy, win);
 	XSelectInput(dpy, win, swa.event_mask);
-	XSync(dpy, True);
 }
 
 static int
@@ -440,6 +468,16 @@ parsegeom(char *b, char *prefix, char *suffix, struct g *g)
 	}
 
 	return 0;
+}
+
+static int
+stoi(char *s, int *r) {
+	char *e;
+	long int li = strtol(s, &e, 10);
+	*r = (int)li;
+	return s[0] < '0' || s[0] > '9' \
+		|| li < INT_MIN || li > INT_MAX \
+		|| *e != '\0';
 }
 
 int
