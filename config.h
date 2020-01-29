@@ -2,6 +2,7 @@
 
 static int borderpx = 0;
 static char font[] = "monospace:size=10";
+static double alpha = 1.0;
 
 struct g px = {.prefix = '-'};
 struct g py = {.prefix = '-'};

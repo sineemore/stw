@@ -44,8 +44,10 @@ static int spipe[2];
 static Display *dpy;
 static int xfd;
 static int screen;
+static int depth = 32;
 static Window win, root;
 static Drawable drawable;
+static GC xgc;
 static XftDraw *xdraw;
 static XftColor xforeground, xbackground;
 static XftFont *xfont;
@@ -86,6 +88,7 @@ usage()
 	[-F font]\n\
 	[-B borderpx]\n\
 	[-p period]\n\
+	[-A alpha]\n\
 	command [args ...]",
 argv0);
 }
@@ -187,13 +190,15 @@ draw()
 	mh += borderpx * 2;
 
 	if (mw != prev_mw || mh != prev_mh) {
+		// todo: for some reason old GC value still works after XFreePixmap call
 		XFreePixmap(dpy, drawable);
-		drawable = XCreatePixmap(dpy, root, mw, mh, DefaultDepth(dpy, screen));
+		drawable = XCreatePixmap(dpy, root, mw, mh, depth);
 		if (!drawable)
 			die("cannot allocate drawable");
 		XftDrawChange(xdraw, drawable);
 	}
-	XftDrawRect(xdraw, &xbackground, 0, 0, mw, mh);
+	XSetForeground(dpy, xgc, xbackground.pixel);
+	XFillRectangle(dpy, drawable, xgc, 0, 0, mw,mh);
 
 	// render text lines
 	unsigned int y = borderpx;
@@ -349,14 +354,8 @@ run()
 				y += v;
 			}
 
-			XMoveResizeWindow(
-				dpy, win, x, y,
-				mw, mh
-			);
-			XCopyArea(
-				dpy, drawable, win, XDefaultGC(dpy, screen),
-				0, 0, mw, mh, 0, 0
-			);
+			XMoveResizeWindow(dpy, win, x, y,mw, mh);
+			XCopyArea(dpy, drawable, win, xgc, 0, 0, mw, mh, 0, 0);
 			XSync(dpy, False);
 		}
 	}
@@ -392,32 +391,54 @@ setup(char *font)
 	sw = DisplayWidth(dpy, screen);
 	sh = DisplayHeight(dpy, screen);
 
-	Visual *visual = DefaultVisual(dpy, screen);
-	Colormap colormap = DefaultColormap(dpy, screen);
+	XVisualInfo vi = {
+		.screen = screen,
+		.depth = depth,
+		.class = TrueColor
+	};
+	XMatchVisualInfo(dpy, screen, vi.depth, TrueColor, &vi);
+	Visual *visual = vi.visual;
+
+	Colormap colormap = XCreateColormap(dpy, root, visual, None);
 	// dumb 1x1 drawable only to initialize xdraw
-	drawable = XCreatePixmap(dpy, root, 1, 1, DefaultDepth(dpy, screen));
+	drawable = XCreatePixmap(dpy, root, 1, 1, vi.depth);
 	xdraw = XftDrawCreate(dpy, drawable, visual, colormap);
 	xfont = XftFontOpenName(dpy, screen, font);
 	if (!xfont)
 		die("cannot load font");
+
 	// todo: use dedicated color variables instead of array
 	if (!XftColorAllocName(dpy, visual, colormap, colors[0], &xforeground))
 		die("cannot allocate foreground color");
 	if (!XftColorAllocName(dpy, visual, colormap, colors[1], &xbackground))
 		die("cannot allocate background color");
 
+	// alpha blending
+	xbackground.pixel &= 0x00FFFFFF;
+	unsigned char r = ((xbackground.pixel >> 16) & 0xff) * alpha;
+	unsigned char g = ((xbackground.pixel >> 8) & 0xff) * alpha;
+	unsigned char b = (xbackground.pixel & 0xff) * alpha;
+	xbackground.pixel = (r << 16) + (g << 8) + b;
+	xbackground.pixel |= (unsigned char)(0xff * alpha) << 24;
+
 	XSetWindowAttributes swa;
 	swa.override_redirect = True;
 	swa.background_pixel = xbackground.pixel;
+	swa.border_pixel = xbackground.pixel;
+	swa.colormap = colormap;
 	swa.event_mask = ExposureMask | ButtonPressMask;
-
 	win = XCreateWindow(
 		dpy, root,
 		-1, -1, 1, 1, 0,
-		CopyFromParent, CopyFromParent, CopyFromParent,
-		CWOverrideRedirect | CWBackPixel | CWEventMask,
+		vi.depth, InputOutput, visual,
+		CWOverrideRedirect | CWBackPixel | CWBorderPixel | CWEventMask | CWColormap,
 		&swa
 	);
+
+	XGCValues gcvalues = {0};
+	gcvalues.graphics_exposures = False;
+	Drawable buf = XCreatePixmap(dpy, win, 1, 1, vi.depth);
+	xgc = XCreateGC(dpy, drawable, GCGraphicsExposures, &gcvalues);
 
 	XLowerWindow(dpy, win);
 	XMapWindow(dpy, win);
@@ -526,6 +547,13 @@ main(int argc, char *argv[])
 		if (stoi(EARGF(usage()), &period))
 			usage();
 		break;
+	case 'A': {
+		char *s = EARGF(usage());
+		char *end;
+		alpha = strtod(s, &end);
+		if (*s == '\0' || *end != '\0' || alpha < 0 || alpha > 1)
+			usage();
+	} break;
 	default:
 		usage();
 	} ARGEND
