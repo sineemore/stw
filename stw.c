@@ -293,19 +293,20 @@ run()
 
 		if (fds[1].revents & POLLIN) {
 			// xlib
-			XEvent ev;
-			if (XNextEvent(dpy, &ev))
-				break;
+			while (XPending(dpy)) {
+				XEvent ev;
+				XNextEvent(dpy, &ev);
 
-			if (ev.type == Expose) {
-				if (ev.xexpose.count == 0) {
-					dirty = 1;
+				if (ev.type == Expose) {
+					if (ev.xexpose.count == 0) {
+						dirty = 1;
+					}
+				} else if (ev.type == ButtonPress) {
+					if (cmdpid && kill(cmdpid, SIGTERM) == -1)
+						die("kill:");
+					alarm(0);
+					restart_now = 1;
 				}
-			} else if (ev.type == ButtonPress) {
-				if (cmdpid && kill(cmdpid, SIGTERM) == -1)
-					die("kill:");
-				alarm(0);
-				restart_now = 1;
 			}
 		}
 
