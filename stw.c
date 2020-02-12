@@ -1,7 +1,6 @@
 /* See LICENSE file for copyright and license details. */
 #include <errno.h>
 #include <limits.h>
-#include <math.h>
 #include <poll.h>
 #include <signal.h>
 #include <stdarg.h>
@@ -11,7 +10,6 @@
 #include <sys/signalfd.h>
 #include <sys/types.h>
 #include <sys/wait.h>
-#include <time.h>
 #include <unistd.h>
 #include <X11/Xft/Xft.h>
 #include <X11/Xlib.h>
@@ -437,7 +435,6 @@ setup(char *font)
 
 	XGCValues gcvalues = {0};
 	gcvalues.graphics_exposures = False;
-	Drawable buf = XCreatePixmap(dpy, win, 1, 1, vi.depth);
 	xgc = XCreateGC(dpy, drawable, GCGraphicsExposures, &gcvalues);
 
 	XLowerWindow(dpy, win);
@@ -540,7 +537,7 @@ main(int argc, char *argv[])
 		const char *a = EARGF(usage());
 		align = a[0];
 		if (strlen(a) != 1 \
-		|| align != 'l' && align != 'r' && align != 'c')
+		|| (align != 'l' && align != 'r' && align != 'c'))
 			usage();
 	} break;
 	case 'p':

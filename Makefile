@@ -4,7 +4,7 @@ NAME    = stw
 CC      = cc
 INCS    = -I/usr/include/X11 -I/usr/include/freetype2
 LIBS    = -lX11 -lfontconfig -lXft -lXrender
-CFLAGS  = -g -std=c99 -pedantic -D_DEFAULT_SOURCE -D_BSD_SOURCE -D_POSIX_C_SOURCE=2 $(INCS)
+CFLAGS  = -g -std=c99 -pedantic -Wall -Werror -D_DEFAULT_SOURCE -D_BSD_SOURCE -D_POSIX_C_SOURCE=2 $(INCS)
 LDFLAGS = $(LIBS)
 SRC     = $(NAME).c
 OBJ     = ${SRC:.c=.o}
