@@ -1,0 +1,77 @@
+.TH STW 1 stw
+.SH NAME
+stw \- simple X text widget
+.SH SYNOPSIS
+.B stw
+.RB [ \-x
+.IR pos ]
+.RB [ \-y
+.IR pos ]
+.RB [ \-X
+.IR pos ]
+.RB [ \-Y
+.IR pos ]
+.RB [ \-a
+.IR align ]
+.RB [ \-f
+.IR foreground ]
+.RB [ \-b
+.IR background ]
+.RB [ \-F
+.IR font ]
+.RB [ \-B
+.IR borderpx ]
+.RB [ \-p
+.IR period ]
+.RB [ \-A
+.IR alpha ]
+.IR command
+.RI [ arg ...]
+.SH DESCRIPTION
+.B stw
+is a simple X text widget.
+.SH OPTIONS
+.TP
+.BI \-x " pos"
+window x position
+.TP
+.BI \-y " pos"
+window y position
+.TP
+.BI \-X " pos"
+window X position
+.TP
+.BI \-Y " pos"
+window Y position
+.TP
+.BI \-a " align"
+text alignment.
+Must be one of {lrc} for left, right and centered
+.TP
+.BI \-f " foreground"
+foreground widget color in hex or as a color name
+.TP
+.BI \-b " background"
+background widget color in hex or as a color name
+.TP
+.BI \-F " font"
+text font in format, supported by fontconfig
+.TP
+.BI \-B " borderpx"
+gap between window border and text in pixels
+.TP
+.BI \-p " period"
+period between command runs in seconds
+.TP
+.BI \-A " alpha"
+window background alpha value
+.TP
+.I command [arg...]
+command will be started with provided arguments and it's output
+will be displayed in the window
+.SH AUTHORS
+See the LICENSE file for the authors.
+.SH LICENSE
+See the LICENSE file for the terms of redistribution.
+.SH SEE ALSO
+.BR watch (1)

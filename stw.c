@@ -74,21 +74,11 @@ die(const char *fmt, ...)
 static void
 usage()
 {
-	die(
-"usage: %s\n\
-	[-x x position]\n\
-	[-y y position]\n\
-	[-X x translate]\n\
-	[-Y y translate]\n\
-	[-a alignment]\n\
-	[-f foreground]\n\
-	[-b background]\n\
-	[-F font]\n\
-	[-B borderpx]\n\
-	[-p period]\n\
-	[-A alpha]\n\
-	command [args ...]",
-argv0);
+	die("\
+usage: stw [-x pos] [-y pos] [-X pos] [-Y pos] [-a align]\n\
+           [-f foreground] [-b background] [-F font] [-B borderpx]\n\
+           [-p period] [-A alpha] command [arg ...]"
+	);
 }
 
 static void
