@@ -2,6 +2,14 @@
 
 stw is simple text widget for X.
 
+Here stw runs pstree and renders its output above desktop wallpaper.
+
+![](example.png)
+
+```
+$ stw -F 'monospace:size=8' pstree -U
+```
+
 stw mostly resembles watch command:
 it creates an unmanaged X window at specified position and starts subcommand.
 If subcommand terminates, stw sleeps specified number of seconds and restarts it.
