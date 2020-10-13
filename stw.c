@@ -134,9 +134,12 @@ read_text()
 		char *line = &text[len];
 		if (NULL == fgets(line, cap - len, inputf)) {
 			if (feof(inputf)) {
+				if (fclose(inputf) == -1)
+					die("fclose subcommand output:");
+				inputf = NULL;
 				break;
 			} else {
-				die("error reading stdin");
+				die("fgets subcommand output:");
 			}
 		}
 
@@ -228,32 +231,38 @@ reap()
 			cmdpid = 0;
 		}
 	}
-	if (fclose(inputf) == -1)
-		die("close:");
 }
 
 static void
 run()
 {
-	struct pollfd fds[] = {
-		{.fd = spipe[0], .events = POLLIN}, // signals
-		{.fd = xfd,      .events = POLLIN}, // xlib
-		{.fd = 0,        .events = POLLIN}  // cmd stdout (set later)
-	};
-
 	int restart_now = 1;
 	for (;;) {
-		if (restart_now && cmdpid == 0) {
+		if (restart_now && cmdpid == 0 && inputf == NULL) {
 			restart_now = 0;
 			start_cmd();
 		}
 
 		int dirty = 0;
-		fds[2].fd = cmdpid != 0 ? fileno(inputf) : 0;
-		for (int i = 0; i < LENGTH(fds); i++)
-			fds[i].revents = 0;
 
-		if (-1 == poll(fds, LENGTH(fds) - (cmdpid == 0), -1)) {
+		int inputfd = 0;
+		if (inputf != NULL) {
+			inputfd = fileno(inputf);
+			// TODO: Handle fileno error
+		}
+
+		struct pollfd fds[] = {
+			{.fd = spipe[0], .events = POLLIN}, // Signals
+			{.fd = xfd,      .events = POLLIN}, // X events
+			{.fd = inputfd,  .events = POLLIN}  // Subcommand output
+		};
+
+		int fds_len = LENGTH(fds);
+		if (inputfd == 0) {
+			fds_len--;
+		}
+
+		if (-1 == poll(fds, fds_len, -1)) {
 			if (errno == EINTR) {
 				errno = 0;
 				continue;
@@ -261,49 +270,50 @@ run()
 			die("poll:");
 		}
 
+		// Read subcommand output
+		if (inputf && (fds[2].revents & POLLIN)) {
+			read_text();
+			draw();
+			dirty = 1;
+		}
 
+		// Handle signals
 		if (fds[0].revents & POLLIN) {
-			// signals
 			char s;
 			if (-1 == read(spipe[0], &s, 1))
 				die("sigpipe read:");
 
 			if (s == 'c') {
-				// sigchld received
+				// SIGCHLD received
 				reap();
-				if (!restart_now) {
+				if (!restart_now)
 					alarm(period);
-				}
+
 			} else if (s == 'a' && cmdpid == 0) {
-				// sigalrm received
-				start_cmd();
+				// SIGALRM received
+				restart_now = 1;
 			}
 		}
 
+		// Process X events
 		if (fds[1].revents & POLLIN) {
-			// xlib
 			while (XPending(dpy)) {
 				XEvent ev;
 				XNextEvent(dpy, &ev);
 
-				if (ev.type == Expose) {
-					if (ev.xexpose.count == 0) {
-						dirty = 1;
-					}
+				if (ev.type == Expose && ev.xexpose.count == 0) {
+					// Last expose event processed, redraw once
+					dirty = 1;
+				
 				} else if (ev.type == ButtonPress) {
+					// X Window was clicked, restart subcommand
 					if (cmdpid && kill(cmdpid, SIGTERM) == -1)
 						die("kill:");
+
 					alarm(0);
 					restart_now = 1;
 				}
 			}
-		}
-
-		if (fds[2].revents & POLLIN) {
-			// cmd stdout
-			read_text();
-			draw();
-			dirty = 1;
 		}
 
 		if (dirty && mw > 0 && mh > 0) {
