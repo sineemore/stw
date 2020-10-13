@@ -1,6 +1,6 @@
 # stw
 
-stw is simple text widget for X.
+stw is a simple text window for X.
 
 Here stw runs pstree and renders its output above desktop wallpaper.
 
