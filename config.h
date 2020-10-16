@@ -2,12 +2,20 @@
 
 static int borderpx = 0;
 static char font[] = "monospace:size=10";
+
+/* background opacity */
 static double alpha = 1.0;
 
-struct g px = {.prefix = '-'};
-struct g py = {.prefix = '-'};
-struct g tx = {0};
-struct g ty = {0};
+/* X window geometry
+px, py values position window top left corner in the center of the screen,
+after that tx, ty values adjust window position.
+percentages in tx and ty reference window width and height,
+similarly to CSS translate function
+*/
+struct g px = {.value = 50, .suffix = '%'};
+struct g py = {.value = 50, .suffix = '%'};
+struct g tx = {.prefix = '-', .value = 50, .suffix = '%'};
+struct g ty = {.prefix = '-', .value = 50, .suffix = '%'};
 
 /* text alignment: l, r and c for left, right and centered respectively */
 static char align = 'l';
