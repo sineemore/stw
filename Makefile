@@ -1,5 +1,7 @@
 .POSIX:
 .SUFFIXES:
+PREFIX ?= /usr/local
+MAN     = $(PREFIX)/share/man
 NAME    = stw
 CC      = cc
 INCS    = -I/usr/include/X11 -I/usr/include/freetype2
@@ -23,8 +25,8 @@ install: all
 	mkdir -p $(PREFIX)/bin
 	cp -f $(NAME) $(PREFIX)/bin
 	chmod 755 ${DESTDIR}${PREFIX}/bin/$(NAME)
-	mkdir -p ${DESTDIR}${PREFIX}/share/man/man1
-	cp stw.1 ${DESTDIR}${PREFIX}/share/man/man1/stw.1
+	mkdir -p ${DESTDIR}${MAN}/man1
+	cp stw.1 ${DESTDIR}${MAN}/man1/stw.1
 
 clean:
 	rm -f -- $(NAME) $(OBJ)
