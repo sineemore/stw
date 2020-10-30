@@ -27,8 +27,8 @@ struct g {
 #define INITIAL_CAPACITY 2
 
 static char *argv0;
-static unsigned int sw, sh;
-static unsigned int mw, mh;
+static unsigned int screen_width, screen_height;
+static unsigned int window_width, window_height;
 static char **cmd;
 static pid_t cmdpid;
 static FILE *inputf;
@@ -162,33 +162,33 @@ read_text()
 static void
 draw()
 {
-	unsigned int prev_mw = mw;
-	unsigned int prev_mh = mh;
+	unsigned int prev_mw = window_width;
+	unsigned int prev_mh = window_height;
 
 	// find maximum text line width and height
-	mw = 0;
-	mh = 0;
+	window_width = 0;
+	window_height = 0;
 	for (char *line = text; line < text + len; line += strlen(line) + 1) {
 		XGlyphInfo ex;
 		XftTextExtentsUtf8(dpy, xfont, (unsigned char *)line, strlen(line), &ex);
-		if (ex.xOff > mw)
-			mw = ex.xOff;
-		mh += xfont->ascent + xfont->descent;
+		if (ex.xOff > window_width)
+			window_width = ex.xOff;
+		window_height += xfont->ascent + xfont->descent;
 	}
 
-	mw += borderpx * 2;
-	mh += borderpx * 2;
+	window_width += borderpx * 2;
+	window_height += borderpx * 2;
 
-	if (mw != prev_mw || mh != prev_mh) {
+	if (window_width != prev_mw || window_height != prev_mh) {
 		// todo: for some reason old GC value still works after XFreePixmap call
 		XFreePixmap(dpy, drawable);
-		drawable = XCreatePixmap(dpy, root, mw, mh, depth);
+		drawable = XCreatePixmap(dpy, root, window_width, window_height, depth);
 		if (!drawable)
 			die("cannot allocate drawable");
 		XftDrawChange(xdraw, drawable);
 	}
 	XSetForeground(dpy, xgc, xbackground.pixel);
-	XFillRectangle(dpy, drawable, xgc, 0, 0, mw,mh);
+	XFillRectangle(dpy, drawable, xgc, 0, 0, window_width,window_height);
 
 	// render text lines
 	unsigned int y = borderpx;
@@ -199,9 +199,9 @@ draw()
 		// text alignment
 		unsigned int x = borderpx;
 		if (align == 'r') {
-			x = mw - ex.xOff;
+			x = window_width - ex.xOff;
 		} else if (align == 'c') {
-			x = (mw - ex.xOff) / 2;
+			x = (window_width - ex.xOff) / 2;
 		}
 
 		XftDrawStringUtf8(
@@ -316,44 +316,44 @@ run()
 			}
 		}
 
-		if (dirty && mw > 0 && mh > 0) {
+		if (dirty && window_width > 0 && window_height > 0) {
 			// window redraw
 			int x = px.suffix == '%'
-				? (px.value / 100.0) * sw
+				? (px.value / 100.0) * screen_width
 				: px.value;
 
 			if (px.prefix == '-') {
-				x = sw - x - mw;
+				x = screen_width - x - window_width;
 			}
 
 			if (tx.value != '0') {
 				int v = tx.value;
 				if (tx.suffix == '%')
-					v = (v / 100.0) * mw;
+					v = (v / 100.0) * window_width;
 				if (tx.prefix == '-')
 					v *= -1;
 				x += v;
 			}
 
 			int y = py.suffix == '%'
-				? (py.value / 100.0) * sh
+				? (py.value / 100.0) * screen_height
 				: py.value;
 
 			if (py.prefix == '-') {
-				y = sh - y - mh;
+				y = screen_height - y - window_height;
 			}
 
 			if (ty.value != '0') {
 				int v = ty.value;
 				if (ty.suffix == '%')
-					v = (v / 100.0) * mh;
+					v = (v / 100.0) * window_height;
 				if (ty.prefix == '-')
 					v *= -1;
 				y += v;
 			}
 
-			XMoveResizeWindow(dpy, win, x, y,mw, mh);
-			XCopyArea(dpy, drawable, win, xgc, 0, 0, mw, mh, 0, 0);
+			XMoveResizeWindow(dpy, win, x, y, window_width, window_height);
+			XCopyArea(dpy, drawable, win, xgc, 0, 0, window_width, window_height, 0, 0);
 			XSync(dpy, False);
 		}
 	}
@@ -386,8 +386,8 @@ setup(char *font)
 	screen = DefaultScreen(dpy);
 	root = RootWindow(dpy, screen);
 
-	sw = DisplayWidth(dpy, screen);
-	sh = DisplayHeight(dpy, screen);
+	screen_width = DisplayWidth(dpy, screen);
+	screen_height = DisplayHeight(dpy, screen);
 
 	XVisualInfo vi = {
 		.screen = screen,
