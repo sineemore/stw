@@ -233,6 +233,16 @@ reap()
 	}
 }
 
+static int
+pos(struct g g, int size)
+{
+	int sign = g.prefix == '-' ? -1 : 1;
+	switch (g.suffix) {
+	case '%': return sign * (g.value / 100.0) * size;
+	default:  return sign * g.value;
+	}
+}
+
 static void
 run()
 {
@@ -317,40 +327,18 @@ run()
 		}
 
 		if (dirty && window_width > 0 && window_height > 0) {
-			// window redraw
-			int x = px.suffix == '%'
-				? (px.value / 100.0) * screen_width
-				: px.value;
 
+			int x = pos(px, screen_width);
 			if (px.prefix == '-') {
-				x = screen_width - x - window_width;
+				x = screen_width + x - window_width;
 			}
+			x += pos(tx, window_width);
 
-			if (tx.value != '0') {
-				int v = tx.value;
-				if (tx.suffix == '%')
-					v = (v / 100.0) * window_width;
-				if (tx.prefix == '-')
-					v *= -1;
-				x += v;
-			}
-
-			int y = py.suffix == '%'
-				? (py.value / 100.0) * screen_height
-				: py.value;
-
+			int y = pos(py, screen_height);
 			if (py.prefix == '-') {
-				y = screen_height - y - window_height;
+				y = screen_height + y - window_height;
 			}
-
-			if (ty.value != '0') {
-				int v = ty.value;
-				if (ty.suffix == '%')
-					v = (v / 100.0) * window_height;
-				if (ty.prefix == '-')
-					v *= -1;
-				y += v;
-			}
+			y += pos(ty, window_height);
 
 			XMoveResizeWindow(dpy, win, x, y, window_width, window_height);
 			XCopyArea(dpy, drawable, win, xgc, 0, 0, window_width, window_height, 0, 0);
