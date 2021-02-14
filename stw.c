@@ -76,7 +76,7 @@ usage()
 	die("\
 usage: stw [-x pos] [-y pos] [-X pos] [-Y pos] [-a align]\n\
            [-f foreground] [-b background] [-F font] [-B borderpx]\n\
-           [-p period] [-A alpha] command [arg ...]"
+           [-p period] [-A alpha] [-t ontop] command [arg ...]"
 	);
 }
 
