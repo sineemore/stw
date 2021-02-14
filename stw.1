@@ -25,6 +25,8 @@ stw \- simple X text window
 .IR period ]
 .RB [ \-A
 .IR alpha ]
+.RB [ \-t
+.IR ontop ]
 .IR command
 .RI [ arg ...]
 .SH DESCRIPTION
@@ -65,6 +67,9 @@ period between command runs in seconds
 .TP
 .BI \-A " alpha"
 window background alpha value
+.TP
+.BI \-t " ontop"
+raise the window to the top of the stack
 .TP
 .I command [arg...]
 command will be started with provided arguments and it's output

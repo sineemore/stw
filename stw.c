@@ -425,7 +425,10 @@ setup(char *font)
 	gcvalues.graphics_exposures = False;
 	xgc = XCreateGC(dpy, drawable, GCGraphicsExposures, &gcvalues);
 
-	XLowerWindow(dpy, win);
+  if (windowOnTop)
+    XRaiseWindow(dpy, win);
+  else
+    XLowerWindow(dpy, win);
 	XMapWindow(dpy, win);
 	XSelectInput(dpy, win, swa.event_mask);
 }
@@ -539,6 +542,9 @@ main(int argc, char *argv[])
 		if (*s == '\0' || *end != '\0' || alpha < 0 || alpha > 1)
 			usage();
 	} break;
+  case 't': {
+    windowOnTop = 1;
+  } break;
 	default:
 		usage();
 	} ARGEND
