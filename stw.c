@@ -172,11 +172,11 @@ draw()
 		XGlyphInfo ex;
 		XftTextExtentsUtf8(dpy, xfont, (unsigned char *)line, strlen(line), &ex);
 		if (ex.xOff > window_width)
-			window_width = ex.xOff;
+      window_width = ex.xOff;
 		window_height += xfont->ascent + xfont->descent;
 	}
 
-	window_width += borderpx * 2;
+	window_width += 1;//borderpx * 2;
 	window_height += borderpx * 2;
 
 	if (window_width != prev_mw || window_height != prev_mh) {
