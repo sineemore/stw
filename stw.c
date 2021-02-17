@@ -74,9 +74,9 @@ static void
 usage()
 {
 	die("\
-usage: stw [-x pos] [-y pos] [-X pos] [-Y pos] [-a align]\n\
+usage: stw [-t ] [-x pos] [-y pos] [-X pos] [-Y pos] [-a align]\n\
            [-f foreground] [-b background] [-F font] [-B borderpx]\n\
-           [-p period] [-A alpha] [-t ontop] command [arg ...]"
+           [-p period] [-A alpha] command [arg ...]"
 	);
 }
 
@@ -172,11 +172,11 @@ draw()
 		XGlyphInfo ex;
 		XftTextExtentsUtf8(dpy, xfont, (unsigned char *)line, strlen(line), &ex);
 		if (ex.xOff > window_width)
-      window_width = ex.xOff;
+			window_width = ex.xOff;
 		window_height += xfont->ascent + xfont->descent;
 	}
 
-	window_width += 1;//borderpx * 2;
+	window_width += borderpx * 2;
 	window_height += borderpx * 2;
 
 	if (window_width != prev_mw || window_height != prev_mh) {
@@ -423,7 +423,7 @@ setup(char *font)
 
 	XGCValues gcvalues = {0};
 	gcvalues.graphics_exposures = False;
-	xgc = XCreateGC(dpy, drawable, GCGraphicsExposures, &gcvalues);
+  xgc = XCreateGC(dpy, drawable, GCGraphicsExposures, &gcvalues);
 
   if (windowOnTop)
     XRaiseWindow(dpy, win);
