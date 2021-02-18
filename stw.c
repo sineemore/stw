@@ -4,6 +4,7 @@
 #include <poll.h>
 #include <signal.h>
 #include <stdarg.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -29,6 +30,7 @@ struct g {
 static char *argv0;
 static unsigned int screen_width, screen_height;
 static unsigned int window_width, window_height;
+static bool hidden = true;
 static char **cmd;
 static pid_t cmdpid;
 static FILE *inputf;
@@ -175,6 +177,10 @@ draw()
 			window_width = ex.xOff;
 		window_height += xfont->ascent + xfont->descent;
 	}
+
+	hidden = window_width == 0 || window_height == 0;
+	if (hidden)
+		return;
 
 	window_width += borderpx * 2;
 	window_height += borderpx * 2;
@@ -326,7 +332,18 @@ run()
 			}
 		}
 
-		if (dirty && window_width > 0 && window_height > 0) {
+		if (hidden) {
+			XUnmapWindow(dpy, win);
+			XSync(dpy, False);
+
+		} else if (dirty) {
+			if (window_on_top) {
+				XRaiseWindow(dpy, win);
+			} else {
+				XLowerWindow(dpy, win);
+			}
+			
+			XMapWindow(dpy, win);
 
 			int x = pos(px, screen_width);
 			if (px.prefix == '-') {
@@ -425,11 +442,6 @@ setup(char *font)
 	gcvalues.graphics_exposures = False;
 	xgc = XCreateGC(dpy, drawable, GCGraphicsExposures, &gcvalues);
 
-	if (windowOnTop)
-		XRaiseWindow(dpy, win);
-	else
-		XLowerWindow(dpy, win);
-	XMapWindow(dpy, win);
 	XSelectInput(dpy, win, swa.event_mask);
 }
 
@@ -543,7 +555,7 @@ main(int argc, char *argv[])
 			usage();
 	} break;
 	case 't': {
-		windowOnTop = 1;
+		window_on_top = true;
 	} break;
 	default:
 		usage();

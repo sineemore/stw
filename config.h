@@ -25,4 +25,5 @@ static int period = 5;
 signals stw to render buffered text and continue with next frame;
 it is the only valid use of non-printable characters in subcommand output */
 static char delimeter[] = "\4";
-static unsigned int windowOnTop = 0;
+
+static bool window_on_top = 0;
