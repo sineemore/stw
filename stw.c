@@ -287,7 +287,7 @@ run()
 		}
 
 		// Read subcommand output
-		if (inputf && (fds[2].revents & POLLIN)) {
+		if (inputf && (fds[2].revents & POLLIN || fds[2].revents & POLLHUP)) {
 			read_text();
 			draw();
 			dirty = 1;
