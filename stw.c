@@ -302,8 +302,11 @@ run()
 			if (s == 'c') {
 				// SIGCHLD received
 				reap();
-				if (!restart_now)
+				if (period < 0) {
+					restart_now = 1;
+				} else if (!restart_now) {
 					alarm(period);
+				}
 
 			} else if (s == 'a' && cmdpid == 0) {
 				// SIGALRM received
@@ -496,7 +499,7 @@ stoi(char *s, int *r) {
 	char *e;
 	long int li = strtol(s, &e, 10);
 	*r = (int)li;
-	return s[0] < '0' || s[0] > '9' \
+	return ((s[0] < '0' || s[0] > '9') && s[0] != '-') \
 		|| li < INT_MIN || li > INT_MAX \
 		|| *e != '\0';
 }

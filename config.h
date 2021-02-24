@@ -18,7 +18,9 @@ static char align = 'l';
 /* foreground and background colors */
 static char *colors[2] = { "#000000", "#dddddd" };
 
-/* time in seconds between command runs */
+/* time in seconds between subcommand runs.
+0 will completely disable subcommand restarts and -1 will make them instant.
+in any case a click on a window will still immediately restart subcommand */
 static int period = 5;
 
 /* delimeter string, encountered as a separate line in subcommand output
