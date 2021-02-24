@@ -33,6 +33,9 @@ stw \- simple X text window
 is a simple X text window.
 .SH OPTIONS
 .TP
+.BI \-t
+place window on top
+.TP
 .BI \-x " pos"
 window x position
 .TP
@@ -62,7 +65,7 @@ text font in format, supported by fontconfig
 gap between window border and text in pixels
 .TP
 .BI \-p " period"
-period between command runs in seconds
+period between command runs in seconds. 0 will completely disable subcommand restarts and -1 will make them instant. In any case a click on a window will still immediately restart subcommand
 .TP
 .BI \-A " alpha"
 window background alpha value
@@ -70,6 +73,24 @@ window background alpha value
 .I command [arg...]
 command will be started with provided arguments and it's output
 will be displayed in the window
+
+.SH POSITION
+Use -x, -y options to position stw window corner. -X, -Y options to position window relative to width and height. For example you can use
+
+    -x 50% -y 50% -X -50% -Y -50%
+
+to position stw in the center of the screen.
+
+.SH EXAMPLES
+
+Show current date in the center of the screen:
+
+    $ stw -p 1 -x 50% -y 50% -X -50% -Y -50% -F monospace:size=20 date
+
+Show updated packages:
+
+    $ stw -p 0 sh -c 'xbps-install -nSu | cut -d" " -f1 | head -n 20'
+
 .SH AUTHORS
 See the LICENSE file for the authors.
 .SH LICENSE
