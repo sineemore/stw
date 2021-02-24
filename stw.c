@@ -252,10 +252,10 @@ pos(struct g g, int size)
 static void
 run()
 {
-	int restart_now = 1;
+	bool restart_now = true;
 	for (;;) {
 		if (restart_now && cmdpid == 0 && inputf == NULL) {
-			restart_now = 0;
+			restart_now = false;
 			start_cmd();
 		}
 
@@ -303,14 +303,14 @@ run()
 				// SIGCHLD received
 				reap();
 				if (period < 0) {
-					restart_now = 1;
+					restart_now = true;
 				} else if (!restart_now) {
 					alarm(period);
 				}
 
 			} else if (s == 'a' && cmdpid == 0) {
 				// SIGALRM received
-				restart_now = 1;
+				restart_now = true;
 			}
 		}
 
@@ -330,7 +330,7 @@ run()
 						die("kill:");
 
 					alarm(0);
-					restart_now = 1;
+					restart_now = true;
 				}
 			}
 		}
