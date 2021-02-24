@@ -557,9 +557,9 @@ main(int argc, char *argv[])
 		if (*s == '\0' || *end != '\0' || alpha < 0 || alpha > 1)
 			usage();
 	} break;
-	case 't': {
+	case 't':
 		window_on_top = true;
-	} break;
+		break;
 	default:
 		usage();
 	} ARGEND
