@@ -194,7 +194,7 @@ draw()
 		XftDrawChange(xdraw, drawable);
 	}
 	XSetForeground(dpy, xgc, xbackground.pixel);
-	XFillRectangle(dpy, drawable, xgc, 0, 0, window_width,window_height);
+	XFillRectangle(dpy, drawable, xgc, 0, 0, window_width, window_height);
 
 	// render text lines
 	unsigned int y = borderpx;
