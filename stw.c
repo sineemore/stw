@@ -28,9 +28,6 @@ struct g {
 #define INITIAL_CAPACITY 2
 
 static char *argv0;
-static unsigned int screen_width, screen_height;
-static unsigned int window_width, window_height;
-static bool hidden = true;
 static char **cmd;
 static pid_t cmdpid;
 static FILE *inputf;
@@ -50,6 +47,9 @@ static GC xgc;
 static XftDraw *xdraw;
 static XftColor xforeground, xbackground;
 static XftFont *xfont;
+static unsigned int screen_width, screen_height;
+static unsigned int window_width, window_height;
+static bool hidden = true;
 
 static void
 die(const char *fmt, ...)
