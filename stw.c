@@ -259,7 +259,7 @@ run()
 			start_cmd();
 		}
 
-		int dirty = 0;
+		bool dirty = false;
 
 		int inputfd = 0;
 		if (inputf != NULL) {
@@ -290,7 +290,7 @@ run()
 		if (inputf && (fds[2].revents & POLLIN || fds[2].revents & POLLHUP)) {
 			read_text();
 			draw();
-			dirty = 1;
+			dirty = true;
 		}
 
 		// Handle signals
@@ -322,7 +322,7 @@ run()
 
 				if (ev.type == Expose && ev.xexpose.count == 0) {
 					// Last expose event processed, redraw once
-					dirty = 1;
+					dirty = true;
 				
 				} else if (ev.type == ButtonPress) {
 					// X Window was clicked, restart subcommand
