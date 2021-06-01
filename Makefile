@@ -21,6 +21,9 @@ $(OBJ):
 .c.o:
 	$(CC) $(CFLAGS) -c $<
 
+clean:
+	rm -f -- $(NAME) $(OBJ)
+
 install: all
 	mkdir -p $(DESTDIR)$(PREFIX)/bin
 	cp -f $(NAME) $(DESTDIR)$(PREFIX)/bin
@@ -28,8 +31,5 @@ install: all
 	mkdir -p $(DESTDIR)$(MANPREFIX)/man1
 	cp $(NAME).1 $(DESTDIR)$(MANPREFIX)/man1/
 	chmod 644 $(DESTDIR)$(MANPREFIX)/man1/$(NAME).1
-
-clean:
-	rm -f -- $(NAME) $(OBJ)
 
 .PHONY: all clean install
