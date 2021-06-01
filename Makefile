@@ -22,8 +22,8 @@ $(OBJ):
 	$(CC) $(CFLAGS) -c $<
 
 install: all
-	mkdir -p $(PREFIX)/bin
-	cp -f $(NAME) $(PREFIX)/bin
+	mkdir -p $(DESTDIR)$(PREFIX)/bin
+	cp -f $(NAME) $(DESTDIR)$(PREFIX)/bin
 	chmod 755 $(DESTDIR)$(PREFIX)/bin/$(NAME)
 	mkdir -p $(DESTDIR)$(MANPREFIX)/man1
 	cp $(NAME).1 $(DESTDIR)$(MANPREFIX)/man1/$(NAME).1
