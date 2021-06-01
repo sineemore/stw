@@ -31,4 +31,4 @@ install: all
 clean:
 	rm -f -- $(NAME) $(OBJ)
 
-.PHONY: clean
+.PHONY: all clean install
