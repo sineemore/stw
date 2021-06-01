@@ -26,7 +26,8 @@ install: all
 	cp -f $(NAME) $(DESTDIR)$(PREFIX)/bin
 	chmod 755 $(DESTDIR)$(PREFIX)/bin/$(NAME)
 	mkdir -p $(DESTDIR)$(MANPREFIX)/man1
-	cp $(NAME).1 $(DESTDIR)$(MANPREFIX)/man1/$(NAME).1
+	cp $(NAME).1 $(DESTDIR)$(MANPREFIX)/man1/
+	chmod 644 $(DESTDIR)$(MANPREFIX)/man1/$(NAME).1
 
 clean:
 	rm -f -- $(NAME) $(OBJ)
