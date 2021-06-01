@@ -32,4 +32,8 @@ install: all
 	cp $(NAME).1 $(DESTDIR)$(MANPREFIX)/man1/
 	chmod 644 $(DESTDIR)$(MANPREFIX)/man1/$(NAME).1
 
-.PHONY: all clean install
+uninstall:
+	rm -f $(DESTDIR)$(PREFIX)/bin/$(NAME)
+	rm -f $(DESTDIR)$(MANPREFIX)/man1/$(NAME).1
+
+.PHONY: all clean install uninstall
