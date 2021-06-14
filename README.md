@@ -17,5 +17,6 @@ stw mostly resembles watch command:
 * stw buffers subcommand output.
 * when output line matches specified delimeter line or subcommand terminates, stw renders collected output.
 * each time stw renders, it clears both collected output and X window.
+* stw hides X window on start and when subcommand output is empty.
 
 It is possible to specify font, text align, text color, background color, opacity, window position, border width, sleep period via command line arguments or config.h file.
