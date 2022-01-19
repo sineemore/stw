@@ -110,6 +110,7 @@ start_cmd()
 		close(xfd);
 		close(fds[0]);
 		dup2(fds[1], STDOUT_FILENO);
+		setpgid(0, 0);
 		execvp(cmd[0], cmd);
 		exit(1);
 	}
@@ -326,9 +327,9 @@ run()
 				
 				} else if (ev.type == ButtonPress) {
 					// X Window was clicked, restart subcommand
-					if (cmdpid && kill(cmdpid, SIGTERM) == -1)
+					if (cmdpid && kill(-cmdpid, SIGTERM) == -1) {
 						die("kill:");
-
+					}
 					alarm(0);
 					restart_now = true;
 				}
