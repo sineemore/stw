@@ -14,7 +14,7 @@ OBJ     = $(SRC:.c=.o)
 all: $(NAME)
 
 $(NAME): $(OBJ)
-	$(CC) $(LDFLAGS) -o $@ $^
+	$(CC) $^ $(LDFLAGS) -o $@
 
 .SUFFIXES: .c .o
 $(OBJ):
