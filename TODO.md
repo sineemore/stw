@@ -1,4 +1,0 @@
-- allow to specify maximum/minimum width and height values, optional text wrap or at least suggest a Unix-like way to achieve this
-- more meaningful README.md
-- and a proper man page with examples (about the window geometry)
-- support multiple monitors
