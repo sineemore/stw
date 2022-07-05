@@ -5,8 +5,8 @@ PREFIX    = /usr/local
 MANPREFIX = $(PREFIX)/share/man
 
 # includes and libs
-INCS = -I/usr/include/X11 -I/usr/include/freetype2
-LIBS = -lX11 -lfontconfig -lXft -lXrender
+INCS = -I/usr/include/X11 `pkg-config --cflags fontconfig`
+LIBS = -lX11 -lXft -lXrender `pkg-config --libs fontconfig`
 
 # flags
 CPPFLAGS = -D_DEFAULT_SOURCE -D_BSD_SOURCE -D_POSIX_C_SOURCE=2
