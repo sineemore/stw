@@ -5,10 +5,10 @@ include config.mk
 all: stw 
 
 .c.o:
-	$(CC) $(CFLAGS) -c $<
+	$(CC) $(STWCFLAGS) -c $<
 
 stw: stw.o
-	$(CC) $^ $(LDFLAGS) -o $@
+	$(CC) $^ $(STWLDFLAGS) -o $@
 
 clean:
 	rm -f stw stw.o
