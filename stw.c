@@ -51,6 +51,7 @@ static unsigned int screen_width, screen_height;
 static unsigned int window_width, window_height;
 static bool hidden = true;
 
+__attribute__ ((noreturn))
 static void
 die(const char *fmt, ...)
 {
@@ -113,6 +114,8 @@ start_cmd()
 		setpgid(0, 0);
 		execvp(cmd[0], cmd);
 		exit(1);
+	default:
+		break;
 	}
 
 	close(fds[1]);
@@ -174,7 +177,7 @@ draw()
 	for (char *line = text; line < text + len; line += strlen(line) + 1) {
 		XGlyphInfo ex;
 		XftTextExtentsUtf8(dpy, xfont, (unsigned char *)line, strlen(line), &ex);
-		if (ex.xOff > window_width)
+		if (ex.xOff > (short int)window_width)
 			window_width = ex.xOff;
 		window_height += xfont->ascent + xfont->descent;
 	}
