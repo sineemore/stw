@@ -10,6 +10,8 @@ all: stw
 stw: stw.o
 	$(CC) $^ $(STWLDFLAGS) -o $@
 
+stw.o: arg.h config.h config.mk
+
 clean:
 	rm -f stw stw.o
 
