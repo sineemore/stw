@@ -24,7 +24,7 @@ struct g {
 
 #include "config.h"
 
-#define LENGTH(X) (sizeof X / sizeof X[0])
+#define LENGTH(X) (sizeof(X) / sizeof((X)[0]))
 #define INITIAL_CAPACITY 2
 
 static char *argv0;
@@ -58,15 +58,15 @@ die(const char *fmt, ...)
 	va_list ap;
 
 	va_start(ap, fmt);
-	vfprintf(stderr, fmt, ap);
+	(void)vfprintf(stderr, fmt, ap);
 	va_end(ap);
 
 	if (fmt[0] && fmt[strlen(fmt)-1] == ':') {
-		fputc(' ', stderr);
+		(void)fputc(' ', stderr);
 		errno = tmp;
 		perror(NULL);
 	} else {
-		fputc('\n', stderr);
+		(void)fputc('\n', stderr);
 	}
 
 	exit(1);
@@ -113,6 +113,8 @@ start_cmd()
 		setpgid(0, 0);
 		execvp(cmd[0], cmd);
 		exit(1);
+	default:
+		break;
 	}
 
 	close(fds[1]);
@@ -324,7 +326,7 @@ run()
 				if (ev.type == Expose && ev.xexpose.count == 0) {
 					// Last expose event processed, redraw once
 					dirty = true;
-				
+
 				} else if (ev.type == ButtonPress) {
 					// X Window was clicked, restart subcommand
 					if (cmdpid && kill(-cmdpid, SIGTERM) == -1) {
@@ -346,7 +348,7 @@ run()
 			} else {
 				XLowerWindow(dpy, win);
 			}
-			
+
 			XMapWindow(dpy, win);
 
 			int x = pos(px, screen_width);
