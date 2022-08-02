@@ -51,6 +51,7 @@ static unsigned int screen_width, screen_height;
 static unsigned int window_width, window_height;
 static bool hidden = true;
 
+__attribute__ ((noreturn))
 static void
 die(const char *fmt, ...)
 {
