@@ -76,10 +76,10 @@ die(const char *fmt, ...)
 static void
 usage()
 {
-	die("\
-usage: stw [-t ] [-x pos] [-y pos] [-X pos] [-Y pos] [-a align]\n\
-           [-f foreground] [-b background] [-F font] [-B borderpx]\n\
-           [-p period] [-A alpha] command [arg ...]"
+	die(
+"usage: stw [-Vt] [-x pos] [-y pos] [-X pos] [-Y pos] [-a align]\n"
+"           [-f foreground] [-b background] [-F font] [-B borderpx]\n"
+"           [-p period] [-A alpha] command [arg ...]"
 	);
 }
 
@@ -190,7 +190,7 @@ draw()
 	window_height += borderpx * 2;
 
 	if (window_width != prev_mw || window_height != prev_mh) {
-		// todo: for some reason old GC value still works after XFreePixmap call
+		// TODO: for some reason old GC value still works after XFreePixmap call
 		XFreePixmap(dpy, drawable);
 		drawable = XCreatePixmap(dpy, root, window_width, window_height, depth);
 		if (!drawable)
@@ -417,7 +417,7 @@ setup(char *font)
 	if (!xfont)
 		die("cannot load font");
 
-	// todo: use dedicated color variables instead of array
+	// TODO: use dedicated color variables instead of array
 	if (!XftColorAllocName(dpy, visual, colormap, colors[0], &xforeground))
 		die("cannot allocate foreground color");
 	if (!XftColorAllocName(dpy, visual, colormap, colors[1], &xbackground))
@@ -503,8 +503,8 @@ stoi(char *s, int *r) {
 	char *e;
 	long int li = strtol(s, &e, 10);
 	*r = (int)li;
-	return ((s[0] < '0' || s[0] > '9') && s[0] != '-') \
-		|| li < INT_MIN || li > INT_MAX \
+	return ((s[0] < '0' || s[0] > '9') && s[0] != '-')
+		|| li < INT_MIN || li > INT_MAX
 		|| *e != '\0';
 }
 
@@ -514,6 +514,10 @@ main(int argc, char *argv[])
 	char *xfont = font;
 
 	ARGBEGIN {
+	case 'V':
+		printf("%s " VERSION "\n", argv0);
+		return 0;
+		break;
 	case 'x':
 		if (-1 == parsegeom(EARGF(usage()), "+-", "%", &px))
 			usage();
@@ -546,7 +550,7 @@ main(int argc, char *argv[])
 	case 'a': {
 		const char *a = EARGF(usage());
 		align = a[0];
-		if (strlen(a) != 1 \
+		if (strlen(a) != 1
 		|| (align != 'l' && align != 'r' && align != 'c'))
 			usage();
 	} break;
@@ -575,4 +579,6 @@ main(int argc, char *argv[])
 
 	setup(xfont);
 	run();
+
+	return 0;
 }
