@@ -13,6 +13,7 @@
 #include <unistd.h>
 #include <X11/Xft/Xft.h>
 #include <X11/Xlib.h>
+#include <X11/extensions/shape.h>
 #include <X11/extensions/Xfixes.h>
 
 #include "arg.h"
@@ -451,7 +452,7 @@ setup(char *font)
 	if(overlay) {
 		XRectangle rect;
 		XserverRegion region = XFixesCreateRegion(dpy, &rect, 1);
-		XFixesSetWindowShapeRegion(dpy, win, 2, 0, 0, region);
+		XFixesSetWindowShapeRegion(dpy, win, ShapeInput, 0, 0, region);
 		XFixesDestroyRegion(dpy, region);
 	}
 
