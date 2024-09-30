@@ -28,4 +28,4 @@ signals stw to render buffered text and continue with next frame;
 it is the only valid use of non-printable characters in subcommand output */
 static char delimeter[] = "\4";
 
-static bool window_on_top = 1;
+static bool window_on_top = 0;
