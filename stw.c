@@ -13,6 +13,8 @@
 #include <unistd.h>
 #include <X11/Xft/Xft.h>
 #include <X11/Xlib.h>
+#include <X11/extensions/shape.h>
+#include <X11/extensions/Xfixes.h>
 
 #include "arg.h"
 
@@ -50,6 +52,7 @@ static XftFont *xfont;
 static unsigned int screen_width, screen_height;
 static unsigned int window_width, window_height;
 static bool hidden = true;
+static bool overlay = false;
 
 __attribute__ ((noreturn))
 static void
@@ -445,6 +448,14 @@ setup(char *font)
 		&swa
 	);
 
+	// create a fixed region to allow passthrough
+	if(overlay) {
+		XRectangle rect;
+		XserverRegion region = XFixesCreateRegion(dpy, &rect, 1);
+		XFixesSetWindowShapeRegion(dpy, win, ShapeInput, 0, 0, region);
+		XFixesDestroyRegion(dpy, region);
+	}
+
 	XGCValues gcvalues = {0};
 	gcvalues.graphics_exposures = False;
 	xgc = XCreateGC(dpy, drawable, GCGraphicsExposures, &gcvalues);
@@ -568,6 +579,9 @@ main(int argc, char *argv[])
 	case 't':
 		window_on_top = true;
 		break;
+    case 'o':
+        overlay = true;
+        break;
 	default:
 		usage();
 	} ARGEND
