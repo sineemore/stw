@@ -19,4 +19,4 @@ stw mostly resembles watch command:
 * each time stw renders, it clears both collected output and X window.
 * stw hides X window on start and when subcommand output is empty.
 
-It is possible to specify font, text align, text color, background color, opacity, window position, border width, sleep period via command line arguments or config.h file.
+It is possible to specify font, text align, colors, opacity, position, border width, sleep period via command line arguments or config.h file.

@@ -1,0 +1,203 @@
+From 48f8ca859c0d75fbaf38d78ec35ad51c2e4e911d Mon Sep 17 00:00:00 2001
+From: sineemore <sineemore@disroot.org>
+Date: Thu, 19 Dec 2024 21:30:43 +0100
+Subject: [PATCH] Follow OS theme by listening to DBus
+
+---
+ config.def.h |   2 +
+ config.mk    |   5 +++
+ stw.c        | 107 +++++++++++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 114 insertions(+)
+
+diff --git a/config.def.h b/config.def.h
+index e59abce..f6eeec1 100644
+--- a/config.def.h
++++ b/config.def.h
+@@ -15,6 +15,8 @@ typedef struct {
+ stw_colorscheme schemes[] = {
+ 	{ "black", "#cccccc" }, // regular
+ 	{ "white", "black" }, // matched word
++	{ "white", "#222222" }, // regular (dark)
++	{ "black", "white" }, // matched word (dark)
+ };
+ 
+ /* period is time in seconds between subcommand runs.
+diff --git a/config.mk b/config.mk
+index 4ac1a6e..82abd5f 100644
+--- a/config.mk
++++ b/config.mk
+@@ -13,6 +13,11 @@ INCS = -I$(X11INC) \
+ LIBS = -L$(X11LIB) -lm -lrt -lX11 -lutil -lXft \
+        `$(PKG_CONFIG) --libs fontconfig freetype2 xfixes`
+ 
++LIBSYSTEMDINC   = `$(PKG_CONFIG) --cflags libsystemd`
++LIBSYSTEMDLIBS  = `$(PKG_CONFIG) --libs libsystemd`
++INCS += $(LIBSYSTEMDINC)
++LIBS += $(LIBSYSTEMDLIBS)
++
+ STWCPPFLAGS = -D_XOPEN_SOURCE=600
+ STWCFLAGS   = $(INCS) $(STWCPPFLAGS) $(CPPFLAGS) $(CFLAGS)
+ STWLDFLAGS  = $(LIBS) $(LDFLAGS)
+diff --git a/stw.c b/stw.c
+index fca6944..9e8800c 100644
+--- a/stw.c
++++ b/stw.c
+@@ -14,6 +14,7 @@
+ #include <string.h>
+ #include <sys/types.h>
+ #include <sys/wait.h>
++#include <systemd/sd-bus.h>
+ #include <unistd.h>
+ 
+ #include "arg.h"
+@@ -64,6 +65,7 @@ stw_xcolorscheme *xschemes;
+ XftFont *xfont;
+ unsigned int screen_width, screen_height;
+ bool overlay = false;
++sd_bus *bus = NULL;
+ 
+ void die(const char *fmt, ...)
+ {
+@@ -326,6 +328,33 @@ void draw(stw_window win, stw_word *selected)
+         }
+ }
+ 
++bool dbus_process()
++{
++        bool dirty = false;
++        for (;;) {
++                sd_bus_message *m = NULL;
++                int r = sd_bus_process(bus, &m);
++                if (r < 0)
++                        die("sd_bus_process: %s", strerror(-r));
++                if (m != NULL) {
++                        if (strcmp(sd_bus_message_get_interface(m), "org.freedesktop.portal.Settings") == 0 &&
++                            strcmp(sd_bus_message_get_member(m), "SettingChanged") == 0) {
++                                uint32_t u = 0;
++                                r = sd_bus_message_read(m, "ssv", NULL, NULL, "u", &u);
++                                if (r < 0)
++                                        die("sd_bus_message_read: %s", strerror(-r));
++                                scheme = u == 1 ? 2 : 0;
++                                dirty = true;
++                        }
++
++                        sd_bus_message_unref(m);
++                }
++                if (r == 0)
++                        break;
++        }
++        return dirty;
++}
++
+ void run()
+ {
+         char run_now = 'a';
+@@ -405,6 +434,7 @@ void run()
+                 struct pollfd fds[] = {
+                     {.fd = spipe[0], .events = POLLIN},
+                     {.fd = xfd, .events = POLLIN},
++                    {.fd = sd_bus_get_fd(bus), .events = sd_bus_get_events(bus)},
+                 };
+ 
+                 if (-1 == poll(fds, LENGTH(fds), period == 0 ? 0 : -1)) {
+@@ -455,6 +485,13 @@ void run()
+                                 }
+                         }
+                 }
++
++                if (fds[2].revents != 0) {
++                        if (dbus_process()) {
++                                draw(nwin, selected);
++                                dirty = true;
++                        }
++                }
+         }
+ }
+ 
+@@ -468,6 +505,74 @@ void blend(XftColor *c, double alpha)
+         c->pixel |= (unsigned char)(0xff * alpha) << 24;
+ }
+ 
++void dbus_setup()
++{
++        int r;
++        sd_bus *ubus = NULL;
++        r = sd_bus_open_user(&ubus);
++        if (r < 0)
++                die("sd_bus_open_user: %s", strerror(-r));
++
++        sd_bus_error error = SD_BUS_ERROR_NULL;
++
++        sd_bus_message *reply = NULL;
++        r = sd_bus_call_method(ubus, "org.freedesktop.portal.Desktop", "/org/freedesktop/portal/desktop",
++                               "org.freedesktop.portal.Settings", "Read", &error, &reply, "ss",
++                               "org.freedesktop.appearance", "color-scheme");
++        if (r < 0)
++                die("sd_bus_call_method: %s", strerror(-r));
++
++        uint32_t u;
++        r = sd_bus_message_read(reply, "v", "v", "u", &u);
++        if (r < 0)
++                die("sd_bus_message_read: %s", strerror(-r));
++        sd_bus_message_unref(reply);
++
++        scheme = u == 1 ? 2 : 0;
++
++        r = sd_bus_new(&bus);
++        if (r < 0)
++                die("sd_bus_new: %s", strerror(-r));
++
++        r = sd_bus_set_monitor(bus, true);
++        if (r < 0)
++                die("sd_bus_set_monitor: %s", strerror(-r));
++
++        r = sd_bus_set_bus_client(bus, true);
++        if (r < 0)
++                die("sd_bus_set_bus_client: %s", strerror(-r));
++
++        const char *addr = NULL;
++        r = sd_bus_get_address(ubus, &addr);
++        if (r < 0)
++                die("sd_bus_get_address: %s", strerror(-r));
++
++        r = sd_bus_set_address(bus, addr);
++        if (r < 0)
++                die("sd_bus_set_address: %s", strerror(-r));
++
++        r = sd_bus_start(bus);
++        if (r < 0)
++                die("sd_bus_start: %s", strerror(-r));
++
++        r = sd_bus_add_match(bus, NULL,
++                             "type=signal,"
++                             "interface=org.freedesktop.portal.Settings,"
++                             "member=SettingChanged,"
++                             "arg0=org.freedesktop.appearance,"
++                             "arg1=color-scheme",
++                             NULL, NULL);
++        if (r < 0)
++                die("sd_bus_add_match: %s", strerror(-r));
++
++        r = sd_bus_process(bus, NULL);
++        if (r < 0)
++                die("sd_bus_process: %s", strerror(-r));
++
++        sd_bus_close(ubus);
++        sd_bus_unref(ubus);
++}
++
+ void setup()
+ {
+         if (pipe(spipe) == -1)
+@@ -533,6 +638,8 @@ void setup()
+         gc = XCreateGC(dpy, drawable, GCGraphicsExposures, &gcvalues);
+ 
+         XSelectInput(dpy, win, swa.event_mask);
++
++        dbus_setup();
+ }
+ 
+ int parsecomma(char *b, int (*parse)(int, char *, size_t))
+-- 
+2.46.0
+

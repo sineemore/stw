@@ -1,17 +1,27 @@
-# stw version
-VERSION := 0.4
+# Customize below to fit your system, defaults are for Void Linux
 
-# Customize below to fit your system
-
-# paths
-PREFIX ?= /usr/local
+PREFIX    = /usr/local
 MANPREFIX = $(PREFIX)/share/man
 
-# includes and libs
-INCS = `pkg-config --cflags fontconfig`
-LIBS = `pkg-config --libs fontconfig xft xrender xfixes`
+X11INC = /usr/include/X11
+X11LIB =
 
-# flags
-STWCPPFLAGS = -DVERSION=\"$(VERSION)\" -D_DEFAULT_SOURCE -D_BSD_SOURCE -D_POSIX_C_SOURCE=2 $(INCS)
-STWCFLAGS   = -std=c99 -pedantic -Wall -Wno-shadow -Wno-sign-compare $(STWCPPFLAGS) $(CPPFLAGS) $(CFLAGS)
+PKG_CONFIG = pkg-config
+
+INCS = -I$(X11INC) \
+       `$(PKG_CONFIG) --cflags fontconfig freetype2`
+LIBS = -L$(X11LIB) -lm -lrt -lX11 -lutil -lXft \
+       `$(PKG_CONFIG) --libs fontconfig freetype2 xfixes`
+
+STWCPPFLAGS = -D_XOPEN_SOURCE=600
+STWCFLAGS   = $(INCS) $(STWCPPFLAGS) $(CPPFLAGS) $(CFLAGS)
 STWLDFLAGS  = $(LIBS) $(LDFLAGS)
+
+# OpenBSD: (untested)
+#STWCPPFLAGS = -D_XOPEN_SOURCE=600 -D_BSD_SOURCE
+#LIBS = -L$(X11LIB) -lm -lX11 -lutil -lXft \
+#       `$(PKG_CONFIG) --libs fontconfig` \
+#       `$(PKG_CONFIG) --libs freetype2`
+
+# compiler and linker
+# CC = c99
