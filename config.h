@@ -1,31 +1,46 @@
 /* See LICENSE file for copyright and license details. */
+#include <stdbool.h>
 
-static int borderpx = 0;
-static char font[] = "monospace:size=10";
+int borderpx = 0;
+char *font = "monospace:size=10";
+bool window_on_top = 0;
 
-/* background opacity */
-static double alpha = 1.0;
+// bgalpha is the alpha value of the background color.
+double bgalpha = 1.0;
+
+typedef struct {
+	char *fg;
+	char *bg;
+} stw_colorscheme;
+
+stw_colorscheme schemes[] = {
+	{ .fg="#000000", .bg="#cccccc" }, // regular
+	{ .fg="#000000", .bg="#aaaaaa" }, // matched word
+	{ .fg="#ffffff", .bg="#222222" }, // regular (dark)
+	{ .fg="#ffffff", .bg="#444444" }, // matched word (dark)
+};
+
+/* period is time in seconds between subcommand runs.
+0 disables subcommand restarts and -1 makes them instant.
+clicks on a window restarts subcommand */
+int period = 5;
+
+/* align is the text alignment: l, r, c for left, right, centered. */
+char align = 'l';
+
+/* clickable is the regex to match clickable words.
+If matched text is clicked, the subcommand is restarted with
+env var STW_SELECTED set to the clicked word. */
+char *clickable = "";
+
+typedef struct {
+	int value;
+	char prefix;
+	char suffix;
+} stw_geometry;
 
 /* X window geometry */
-struct g px = {0};
-struct g py = {0};
-struct g tx = {0};
-struct g ty = {0};
-
-/* text alignment: l, r and c for left, right and centered respectively */
-static char align = 'l';
-
-/* foreground and background colors */
-static char *colors[2] = { "#000000", "#dddddd" };
-
-/* time in seconds between subcommand runs.
-0 will completely disable subcommand restarts and -1 will make them instant.
-in any case a click on a window will still immediately restart subcommand */
-static int period = 5;
-
-/* delimeter string, encountered as a separate line in subcommand output
-signals stw to render buffered text and continue with next frame;
-it is the only valid use of non-printable characters in subcommand output */
-static char delimeter[] = "\4";
-
-static bool window_on_top = 0;
+stw_geometry px = {0};
+stw_geometry py = {0};
+stw_geometry tx = {0};
+stw_geometry ty = {0};

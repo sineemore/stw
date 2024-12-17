@@ -1,72 +1,53 @@
-.TH STW 1 stw\-VERSION
+.TH STW 1 stw
 .SH NAME
 stw \- simple X text window
 .SH SYNOPSIS
 .B stw
-.RB [ \-V ]
-.RB [ \-t ]
-.RB [ \-x
-.IR pos ]
-.RB [ \-y
-.IR pos ]
-.RB [ \-X
-.IR pos ]
-.RB [ \-Y
-.IR pos ]
+.RB [ \-to ]
+.RB [ \-g
+.IR geometry ]
+.RB [ \-c
+.IR colors ]
+.RB [ \-f
+.IR font ]
 .RB [ \-a
 .IR align ]
-.RB [ \-f
-.IR foreground ]
 .RB [ \-b
-.IR background ]
-.RB [ \-F
-.IR font ]
-.RB [ \-B
 .IR borderpx ]
 .RB [ \-p
 .IR period ]
 .RB [ \-A
 .IR alpha ]
+.RB [ \-r
+.IR regexp ]
 .IR command
 .RI [ arg ...]
 .SH DESCRIPTION
 .B stw
-is a simple X text window.
+is a simple X text window
 .SH OPTIONS
-.TP
-.BI \-V
-Print the version information, then exit.
 .TP
 .BI \-t
 place window on top
 .TP
-.BI \-x " pos"
-window x position
+.BI \-o
+enable pointer events pass through
 .TP
-.BI \-y " pos"
-window y position
+.BI \-g " geometry"
+window geometry, see POSITION section
 .TP
-.BI \-X " pos"
-window X position
+.BI \-c " colors"
+colorscheme, see COLORS section
 .TP
-.BI \-Y " pos"
-window Y position
+.BI \-f " font"
+text font in format, supported by fontconfig
 .TP
 .BI \-a " align"
 text alignment.
 Must be one of {lrc} for left, right and centered
 .TP
-.BI \-f " foreground"
-foreground window color in hex or as a color name
-.TP
-.BI \-b " background"
-background window color in hex or as a color name
-.TP
-.BI \-F " font"
-text font in format, supported by fontconfig
-.TP
-.BI \-B " borderpx"
-gap between window border and text in pixels
+.BI \-b " borderpx"
+window padding in pixels
 .TP
 .BI \-p " period"
 period between command runs in seconds. 0 will completely disable subcommand restarts and -1 will make them instant. In any case a click on a window will still immediately restart subcommand
@@ -74,16 +55,66 @@ period between command runs in seconds. 0 will completely disable subcommand res
 .BI \-A " alpha"
 window background alpha value
 .TP
+.BI \-r " regexp"
+regexp to match clickable text
 .I command [arg...]
 command will be started with provided arguments and it's output
 will be displayed in the window
 
 .SH POSITION
-Use -x, -y options to position stw window corner. -X, -Y options to position window relative to width and height. For example you can use
+To position stw window use -g option. It accepts geometry options in format
 
-    -x 50% -y 50% -X -50% -Y -50%
+    [+-]NUMBER[%]
 
-to position stw in the center of the screen.
+It is possible to specify corner of the window and offset from it. For example
+
+    -g +100,+50
+
+will position window 100 pixels from the left and 50 pixels from the top of the screen. You can also use negative values to position window from the right or bottom of the screen. For example
+
+    -g -100,-50
+
+will position window 100 pixels from the right and 50 pixels from the bottom of the screen.
+
+Third and fourth options control postion relative to window size. For example
+
+    -g 50%,50%,-50%,-50%
+
+will position window in the center of the screen.
+
+You can skip some options using empty values. For example
+
+    -g ,-0
+
+will position window at the bottom of the screen, same as
+
+    -g 0,-0
+
+.SH COLORS
+
+To specify fg and bg colors use -c option. It accepts named colors and hex values in format '#RRGGBB'. For example
+
+    -c black,white
+
+will set black text on white background. You can repeat pairs to specify fg and bg colors for other colorschemes. For example
+
+    -c black,white,red,green
+
+will set red text on green background for second colorscheme. 
+
+.SH CLICKABLE TEXT
+
+To make text clickable use -r option. It accepts extended POSIX regular expressions. For example
+
+    -r '[[^]]+]'
+
+will make text between square brackets clickable.
+
+Matched text will be highlighted using secondary colorscheme.
+
+Clicking on matched text will restart command with env variable STW_SELECTED set to matched text.
+
+NOTE: Clicking on any other part of the window will still restart command without STW_SELECTED set.
 
 .SH EXAMPLES
 
